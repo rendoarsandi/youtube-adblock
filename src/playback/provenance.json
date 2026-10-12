@@ -1,0 +1,29 @@
+{
+  "source_repo": "https://gitlab.com/ReVanced/revanced-patches",
+  "commit": "015fe10a23ea5b919a3fda6e7da2c176517ae75d",
+  "date": "2026-10-12",
+  "license": "GPL-3.0",
+  "maven": {
+    "url": "https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-javalite/4.35.1/protobuf-javalite-4.35.1.jar",
+    "sha256": "45d3769189888e491ab7d58125f2014c2a86fb8104c7aa3878c723943fce7a14",
+    "license": "BSD-3-Clause"
+  },
+  "source_files": {
+    "ClientType.java": {
+      "upstream": "extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof/ClientType.java",
+      "source_sha256": "7e80a4ffcd4f6ec6d0bfadd34d3a6815037261d70603ea7595bc70bee029cfa5"
+    },
+    "SpoofVideoStreamsPatch.java": {
+      "upstream": "extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof/SpoofVideoStreamsPatch.java",
+      "source_sha256": "a4edd94fc984bee370f7792ceff47603dfb13c6e59033ffadf33beb333b8a638"
+    },
+    "PlayerRoutes.java": {
+      "upstream": "extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof/requests/PlayerRoutes.java",
+      "source_sha256": "57aee8ec4c416cff14c543b2ff15b53c940b1cf8f6d8b579bd33447c3f45188a"
+    },
+    "StreamingDataRequest.java": {
+      "upstream": "extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof/requests/StreamingDataRequest.java",
+      "source_sha256": "9afbd1f354ac4a60b3ed6b94e4e29ef3a88c3aafd29cdd316e8c4eb7bd5f07b4"
+    }
+  }
+}

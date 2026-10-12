@@ -1,0 +1,43 @@
+{
+  "changed_member": "resources.arsc",
+  "restored_specs": [
+    {
+      "package_id": 127,
+      "type_id": 6,
+      "merged_count": 2339,
+      "restored_count": 4327
+    },
+    {
+      "package_id": 127,
+      "type_id": 8,
+      "merged_count": 2431,
+      "restored_count": 5722
+    },
+    {
+      "package_id": 127,
+      "type_id": 9,
+      "merged_count": 40,
+      "restored_count": 97
+    },
+    {
+      "package_id": 127,
+      "type_id": 13,
+      "merged_count": 30,
+      "restored_count": 33
+    },
+    {
+      "package_id": 127,
+      "type_id": 17,
+      "merged_count": 5,
+      "restored_count": 26
+    },
+    {
+      "package_id": 127,
+      "type_id": 24,
+      "merged_count": 45,
+      "restored_count": 46
+    }
+  ],
+  "before_sha256": "e2171495ca2b698016c34f1d19225782c8e9a6914a2026db62e2501a77b95f2d",
+  "after_sha256": "d397c5e6184ddb4cae551985fd3ce820f812d4d7b364fad8c7c00b795c6c432f"
+}

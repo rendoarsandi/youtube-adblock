@@ -1,0 +1,50 @@
+[
+  {
+    "dex": "classes.dex",
+    "classes": 4935,
+    "methods_decoded": 36056,
+    "strings": 41527
+  },
+  {
+    "dex": "classes2.dex",
+    "classes": 6514,
+    "methods_decoded": 39526,
+    "strings": 43313
+  },
+  {
+    "dex": "classes3.dex",
+    "classes": 9788,
+    "methods_decoded": 46195,
+    "strings": 43400
+  },
+  {
+    "dex": "classes4.dex",
+    "classes": 7649,
+    "methods_decoded": 40010,
+    "strings": 40810
+  },
+  {
+    "dex": "classes5.dex",
+    "classes": 9362,
+    "methods_decoded": 40695,
+    "strings": 43848
+  },
+  {
+    "dex": "classes6.dex",
+    "classes": 8615,
+    "methods_decoded": 39796,
+    "strings": 36609
+  },
+  {
+    "dex": "classes7.dex",
+    "classes": 8644,
+    "methods_decoded": 28870,
+    "strings": 29622
+  },
+  {
+    "dex": "classes8.dex",
+    "classes": 645,
+    "methods_decoded": 4470,
+    "strings": 3774
+  }
+]

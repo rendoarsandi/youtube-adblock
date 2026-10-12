@@ -1,0 +1,90 @@
+[
+  {
+    "dex": "classes2.dex",
+    "method": "Lafnb;->aL(Lafbr;Ljava/util/Map;[BLaezf;Lorg/chromium/net/UrlRequest$Callback;Lafem;Laeyk;)Lorg/chromium/net/UrlRequest$Builder;",
+    "original_code": "0x1f65cc",
+    "insert_before_code_unit": 23,
+    "smali": "invoke-static {v2, v6}, Lapp/revanced/extension/shared/spoof/StandaloneDefaults;->filterPlayerRequest(Ljava/lang/String;Ljava/util/Map;)Ljava/lang/String;\nmove-result-object v2",
+    "purpose": "Launch replacement stream fetch, block att/get and get_watch at actual generic Cronet request URL. Equivalent request interception; get_watch injection site differs from old upstream and still requires runtime validation.",
+    "expected_access_flags": 9,
+    "expected_register_count": 12,
+    "instructions_sha256": "6b79cdc7b3236b13cdd6a542669233fb8fce2c63cb5dc3282fbbddf6e6b14c72"
+  },
+  {
+    "dex": "classes.dex",
+    "method": "Ldlu;->o(Ldjs;)Lorg/chromium/net/UrlRequest$Builder;",
+    "original_code": "0x1e48e0",
+    "insert_before_code_unit": 8,
+    "smali": "invoke-static {v0}, Lapp/revanced/extension/shared/spoof/SpoofVideoStreamsPatch;->blockInitPlaybackRequest(Ljava/lang/String;)Ljava/lang/String;\nmove-result-object v0",
+    "purpose": "Request fallback before Cronet builder URL is used.",
+    "expected_access_flags": 4,
+    "expected_register_count": 8,
+    "instructions_sha256": "9246d5232aa6bd234e8ace54e257eccaf0d8566fed9127e0c88194e8746bb153"
+  },
+  {
+    "dex": "classes2.dex",
+    "method": "Lakul;-><init>(Lbgmw;)V",
+    "original_code": "0x342674",
+    "insert_before_code_unit": 44,
+    "smali": "invoke-direct {v4, v0}, Lakul;->patch_setStreamingData(Lbgna;)V",
+    "purpose": "Call added class-local streaming-bridge method after videoDetails default resolution and fieldb initialization, before caller overwritesv0.",
+    "expected_access_flags": 65537,
+    "expected_register_count": 6,
+    "instructions_sha256": "0ae244895e82439ccf496a75d5842cb6dd141d72478998f8558def5ce9153491"
+  },
+  {
+    "dex": "classes.dex",
+    "method": "Ldjs;-><init>(Landroid/net/Uri;JLjava/lang/String;I[BLjava/util/Map;JJLjava/lang/String;ILjava/lang/Object;)V",
+    "original_code": "0x5027b8",
+    "insert_before_code_unit": 103,
+    "smali": "move-object v0, v10\niget-object v1, v0, Ldjs;->a:Landroid/net/Uri;\niget v2, v0, Ldjs;->d:I\niget-object v3, v0, Ldjs;->e:[B\ninvoke-static {v1, v2, v3}, Lapp/revanced/extension/shared/spoof/SpoofVideoStreamsPatch;->removeVideoPlaybackPostBody(Landroid/net/Uri;I[B)[B\nmove-result-object v1\niput-object v1, v0, Ldjs;->e:[B",
+    "purpose": "Remove Android-specific POST body only for spoofed videoplayback requests.",
+    "expected_access_flags": 65537,
+    "expected_register_count": 25,
+    "instructions_sha256": "ef9698a3f282e8dad7a8c28d29ba2154f917d5367e8b689e54347769dad1a107"
+  },
+  {
+    "dex": "classes2.dex",
+    "method": "Laoja;->a(Laoku;Laumz;Lasbi;Lapcj;Lafbr;Lanjz;Laoix;)Laojd;",
+    "original_code": "0x2503c4",
+    "insert_before_code_unit": 13,
+    "smali": "const/4 v15, 0x0",
+    "purpose": "Disable flag45645570 following correspondingmove-result.",
+    "expected_access_flags": 17,
+    "expected_register_count": 44,
+    "instructions_sha256": "2f424569f46bad564911250bdcbec91dee2b14fa859d9638bf6e327e1e50941f"
+  },
+  {
+    "dex": "classes.dex",
+    "method": "Lihd;->ad()Lasaz;",
+    "original_code": "0x2ce4bc",
+    "insert_before_code_unit": 56,
+    "smali": "const/4 v6, 0x0",
+    "purpose": "Disable exactly flag45665455 aftermove-resultp0 atCU0x37; beforeLasay.e(Z) atCU0x38. Do not alter earlier unrelated OR flags.",
+    "expected_access_flags": 16,
+    "expected_register_count": 7,
+    "instructions_sha256": "efedacdedfcbae4a817096e8ac95be0be930ab945be2c2b510da413faf2ac98a"
+  },
+  {
+    "dex": "classes2.dex",
+    "method": "Laosi;->ax(ZLblgy;)V",
+    "original_code": "0x2560a4",
+    "insert_before_code_unit": 143,
+    "smali": "const/16 v8, 0x0",
+    "purpose": "Optional Apple-client livestream timing fix corresponding flag45355374.",
+    "expected_access_flags": 17,
+    "expected_register_count": 25,
+    "instructions_sha256": "e4ecbff5ae5a96fabe48af30a8c27251e06ef06d1c68d60259cc5a402ac5b120"
+  },
+  {
+    "dex": "classes2.dex",
+    "method": "Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager;->c(Lakui;Lakun;)Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;",
+    "original_code": "0x2e8d9c",
+    "insert_before_code_unit": 0,
+    "smali": "sget-object v0, Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;->e:Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;\nreturn-object v0",
+    "purpose": "Fixed-enabled equivalent of official disableSABR early return; enum e verifiednameDISABLED_BY_SABR_STREAMING_URI.",
+    "expected_access_flags": 18,
+    "expected_register_count": 4,
+    "instructions_sha256": "11f3d752e74f3973bb33b78d35edc95b4a4fb7bdd90a7d810c2e30f372cd72d4"
+  }
+]

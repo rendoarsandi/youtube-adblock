@@ -1,0 +1,1 @@
+package android.text; public class TextUtils { public static boolean isEmpty(CharSequence s){return false;} }

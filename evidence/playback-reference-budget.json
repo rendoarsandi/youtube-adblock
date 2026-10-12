@@ -1,0 +1,42 @@
+[
+  {
+    "dex": "classes.dex",
+    "field_ids": 51255,
+    "method_ids": 65499
+  },
+  {
+    "dex": "classes2.dex",
+    "field_ids": 52444,
+    "method_ids": 65533
+  },
+  {
+    "dex": "classes3.dex",
+    "field_ids": 56683,
+    "method_ids": 65466
+  },
+  {
+    "dex": "classes4.dex",
+    "field_ids": 60538,
+    "method_ids": 65536
+  },
+  {
+    "dex": "classes5.dex",
+    "field_ids": 49029,
+    "method_ids": 65536
+  },
+  {
+    "dex": "classes6.dex",
+    "field_ids": 53516,
+    "method_ids": 65536
+  },
+  {
+    "dex": "classes7.dex",
+    "field_ids": 40154,
+    "method_ids": 40367
+  },
+  {
+    "dex": "classes8.dex",
+    "field_ids": 1282,
+    "method_ids": 5686
+  }
+]

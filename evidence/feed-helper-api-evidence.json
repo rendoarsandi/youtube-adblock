@@ -1,0 +1,26 @@
+[
+  {
+    "dex": "classes2.dex",
+    "method": "Lakvx;->H()Lbawu;",
+    "access_flags": "0x11",
+    "code_offset": "0x21a8a4"
+  },
+  {
+    "dex": "classes3.dex",
+    "method": "Lbaxc;->toBuilder()Lbawu;",
+    "access_flags": "0x11",
+    "code_offset": "0x1e7c98"
+  },
+  {
+    "dex": "classes3.dex",
+    "method": "Lbawu;->build()Lbaxc;",
+    "access_flags": "0x11",
+    "code_offset": "0x1e6820"
+  },
+  {
+    "dex": "classes3.dex",
+    "method": "Lbawu;->copyOnWrite()V",
+    "access_flags": "0x11",
+    "code_offset": "0x1e6954"
+  }
+]

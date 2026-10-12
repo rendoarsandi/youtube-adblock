@@ -1,0 +1,1 @@
+package android.os; public class Build { public static String MANUFACTURER="",MODEL="",ID=""; public static class VERSION { public static String RELEASE=""; public static int SDK_INT=0; } }

@@ -1,0 +1,17 @@
+{
+  "package": "app.revanced.android.youtube",
+  "version": "21.40.161",
+  "apk_sha256": "aa1738f445e78dec6a6acff341f00fc51a312e8808a541520410fa6d9735df0a",
+  "apk_bytes": 117748648,
+  "signed": true,
+  "runtime_verified": false,
+  "original_classes_preserved": 56152,
+  "helper_classes_added": 610,
+  "dex_roundtrip_validated_classes": 56762,
+  "relocated_original_classes": [
+    "Lalic;",
+    "Lakul;"
+  ],
+  "hook_count": 15,
+  "unchanged_native_library_and_asset_members": 454
+}
