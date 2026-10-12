@@ -4,11 +4,11 @@ Experimental ad-blocking patch and non-root build tools for the exact **YouTube 
 
 This repository contains the patch/build code and playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**The user confirmed that opening microG once resolved an immediate launch crash. Playback and actual ad suppression have not been verified.** This version is outside the checked upstream compatibility list.
+**A launch crash was traced to a feed-hook receiver register and corrected in v0.1.2. Earlier releases contain this defect. Full launch, playback and ad suppression still require device testing.** This version is outside the checked upstream compatibility list.
 
 ## Download and install
 
-Download `YouTube-Ad-Test-21.40.161.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.1-startup-check). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is 117.7 MB.
+Download `YouTube-Ad-Test-21.40.161.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.2-feed-fix). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is 117.7 MB.
 
 1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test. **Open its microG screen once before launching this app.** Allow it to run in the background; sign-in is handled separately.
 2. Install this project's APK and open **YouTube (Ad test)**.
@@ -27,11 +27,11 @@ The test package is `app.revanced.android.youtube`, so it can coexist with offic
 | Non-root sign-in | Redirects selected service constants and metadata to ReVanced GmsCore. |
 | Package/resources | Renames the install package and provider authorities, merges five APKs and repairs sparse resource type specifications. |
 
-There is no complete component-ad filter, Shorts-ad guarantee or settings screen. A startup check now detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start the dependency; it reads no provider values or account data. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Client profiles and server behavior may change.
+There is no complete component-ad filter, Shorts-ad guarantee or settings screen. A startup check now detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start its provider process; it reads no provider values or account data and does not complete microG’s first-open setup. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Client profiles and server behavior may change.
 
-Static validation preserved all 56,152 original classes and checked 611 added helper classes (56,763 total). All 16 hooks matched. Native-library and asset bytes were compared with the merged original; APK signatures, alignment and ZIP CRCs passed. See [the validation report](evidence/validation.json).
+The regression check uses Android ART to verify both feed classes; it reproduced the old APK’s VerifyErrors and passed both corrected classes. See [the crash-fix evidence](evidence/feed-crash-fix.json). Static validation preserved all 56,152 original classes and checked 611 added helper classes (56,763 total). All 16 hooks matched. Native-library and asset bytes were compared with the merged original; APK signatures, alignment and ZIP CRCs passed. See [the validation report](evidence/validation.json).
 
-If the app immediately closes, open **ReVanced GmsCore / microG** once and retry. That resolved the reported launch problem on the user's Android 16 phone. If it still closes, a crash report is needed to distinguish a different failure. This observation does not verify playback or ad blocking.
+Install v0.1.2 or newer to obtain the feed-register fix. Install and open **ReVanced GmsCore / microG** once before launching this app. The earlier microG workaround did not rule out the now-confirmed bytecode defect. If the corrected build still closes, a crash report is needed to identify the remaining failure.
 
 ## Experiment and risks
 
@@ -76,3 +76,14 @@ python build.py --input-dir /private/path/to/apks --d8-jar /path/to/d8.jar \
 ## License
 
 Patch/build code is under [GPL-3.0](LICENSE). See [attribution and third-party notices](THIRD_PARTY_NOTICES.md), including the protobuf BSD license. This license does not grant rights to Google's application code, branding or assets. GmsCore is linked from its official release and is not bundled or reuploaded.
+
+## Android verifier regression check
+
+On the Android host, with your own private APK and D8 compiler:
+
+```bash
+python tests/verify_feed_art.py --apk /private/path/to/built.apk \
+  --d8-jar /path/to/d8.jar --work-dir /private/path/to/new-probe-directory
+```
+
+The check initializes only the actual browse/search endpoint classes, without launching YouTube. Serialization checks alone did not detect the receiver-type bug; this test checks ART's independent acceptance boundary.

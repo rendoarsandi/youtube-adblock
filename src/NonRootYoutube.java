@@ -175,6 +175,13 @@ public final class NonRootYoutube {
                     require(method.getAccessFlags() == 20 && body.getRegisterCount() == (browse ? 2 : 3)
                         && body.getTryBlocks().isEmpty() && original.size() == expected.length, "Feed hook frame changed");
                     for (int i = 0; i < expected.length; i++) require(original.get(i).getOpcode() == expected[i], "Feed opcode guard mismatch");
+                    DexBackedInstruction feedStart = (DexBackedInstruction)original.get(0);
+                    int feedUnits = original.stream().mapToInt(Instruction::getCodeUnits).sum();
+                    try {
+                        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+                            feedStart.dexFile.getDataBuffer().readByteRange(feedStart.instructionStart, feedUnits * 2)));
+                        require(digest.equals(browse ? "b0e34e351a5d5a810a3e6c485c6f17e362b4ad61c7ab71490379c1b84aef3e97" : "a0509629417f996bb020a99a0698776b94a53caffa37a11b61b5721d36f47dff"), "Feed instruction digest changed");
+                    } catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
                     String owner = browse ? "Lalap;" : "Lalic;";
                     require(((ReferenceInstruction)original.get(original.size() - 2)).getReference().toString().equals(owner + "->F([Ljava/lang/String;)V"), "Feed endpoint method changed");
                     if (!browse) require(((OffsetInstruction)original.get(4)).getCodeOffset() == 13, "Search return branch changed");
@@ -212,7 +219,15 @@ public final class NonRootYoutube {
             updated = new ImmutableMethodImplementation(body.getRegisterCount(),
                 List.of(new ImmutableInstruction10x(Opcode.RETURN_VOID)), List.of(), List.of());
         } else if ("browse-ads".equals(hook) || "search-ads".equals(hook)) {
-            MutableMethodImplementation feed = new MutableMethodImplementation(updated);
+            // These methods overwrite their original p0 slot with a String[].
+            // Grow the frame so the actual input receiver stays in a new slot;
+            // copy it into the old slot to preserve every original operand.
+            int savedReceiver = body.getRegisterCount();
+            MethodImplementation expanded = new ImmutableMethodImplementation(
+                savedReceiver + 1, code, body.getTryBlocks(), body.getDebugItems());
+            MutableMethodImplementation feed = new MutableMethodImplementation(expanded);
+            feed.addInstruction(0, new BuilderInstruction12x(
+                Opcode.MOVE_OBJECT, savedReceiver - 1, savedReceiver));
             ImmutableMethodReference helper = new ImmutableMethodReference(
                 "Lapp/local/youtube/adblock/FeedAds;", "patch", List.of("Lakvx;"), "V");
             int returns = 0;
@@ -220,7 +235,7 @@ public final class NonRootYoutube {
                 if (feed.getInstructions().get(index).getOpcode() != Opcode.RETURN_VOID) continue;
                 // Replacing the return first keeps incoming branches on the hook.
                 feed.replaceInstruction(index, new BuilderInstruction3rc(
-                    Opcode.INVOKE_STATIC_RANGE, body.getRegisterCount() - 1, 1, helper));
+                    Opcode.INVOKE_STATIC_RANGE, savedReceiver, 1, helper));
                 feed.addInstruction(index + 1, new BuilderInstruction10x(Opcode.RETURN_VOID));
                 returns++;
             }

@@ -69,7 +69,15 @@
       ],
       "expected_return_count": 1,
       "expected_conditional_branch_count": 0,
-      "expected_try_block_count": 0
+      "expected_try_block_count": 0,
+      "instructions_sha256": "b0e34e351a5d5a810a3e6c485c6f17e362b4ad61c7ab71490379c1b84aef3e97",
+      "corrected_registers": 3,
+      "saved_receiver_register": 2,
+      "original_receiver_slot_is_reused": true,
+      "entry_copy": {
+        "destination": 1,
+        "source": 2
+      }
     },
     {
       "dex": "classes4.dex",
@@ -181,7 +189,15 @@
       ],
       "expected_return_count": 1,
       "expected_conditional_branch_count": 1,
-      "expected_try_block_count": 0
+      "expected_try_block_count": 0,
+      "instructions_sha256": "a0509629417f996bb020a99a0698776b94a53caffa37a11b61b5721d36f47dff",
+      "corrected_registers": 4,
+      "saved_receiver_register": 3,
+      "original_receiver_slot_is_reused": true,
+      "entry_copy": {
+        "destination": 2,
+        "source": 3
+      }
     }
   ],
   "helper_api": [
