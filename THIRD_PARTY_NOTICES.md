@@ -19,3 +19,5 @@ Build tools are official [ReVanced CLI 6.0.0](https://github.com/ReVanced/revanc
 [ReVanced GmsCore](https://github.com/ReVanced/GmsCore), based on microG, is a separate dependency. It is linked from official releases and is not bundled.
 
 The modified APK retains Google's compiled YouTube implementation, resources and branding, which are outside the scope of this repository's source license. No original APK, extracted app asset or complete decompiled Google class is committed to Git. Release attachments contain the experimental modified APK separately.
+
+The local `GmsStartup` helper follows upstream GmsCore installation checking, public-provider acquisition and guidance followed by graceful exit. It uses Java reflection to avoid packaging framework stubs, omits account queries, update-network requests and battery permission dialogs. Source reference: [GmsCoreSupport.java](https://gitlab.com/ReVanced/revanced-patches/-/blob/015fe10a23ea5b919a3fda6e7da2c176517ae75d/extensions/shared/library/src/main/java/app/revanced/extension/shared/GmsCoreSupport.java).

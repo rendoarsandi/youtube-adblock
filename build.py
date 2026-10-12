@@ -174,8 +174,8 @@ def main():
         run(["apksigner", "sign", "--ks", key, "--ks-key-alias", alias, "--ks-pass", "file:" + str(password), "--out", apk, aligned])
     untouched = validate_package(apk, merged, output, not args.unsigned)
     result = {"package": PACKAGE, "version": "21.40.161", "apk_sha256": sha256(apk), "apk_bytes": apk.stat().st_size,
-              "signed": not args.unsigned, "runtime_verified": False, "original_classes_preserved": 56152, "helper_classes_added": 610, "dex_roundtrip_validated_classes": 56762,
-              "relocated_original_classes": ["Lalic;", "Lakul;"], "hook_count": 15,
+              "signed": not args.unsigned, "runtime_verified": False, "startup_dependency_check": True, "original_classes_preserved": 56152, "helper_classes_added": 611, "dex_roundtrip_validated_classes": 56763,
+              "relocated_original_classes": ["Lalic;", "Lakul;"], "hook_count": 16,
               "unchanged_native_library_and_asset_members": untouched}
     (output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     (output / "SHA256SUMS.txt").write_text(result["apk_sha256"] + "  " + apk.name + "\n")

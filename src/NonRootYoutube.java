@@ -74,7 +74,8 @@ public final class NonRootYoutube {
         Map.entry("Laoja;->a(Laoku;Laumz;Lasbi;Lapcj;Lafbr;Lanjz;Laoix;)Laojd;", new StreamHook(4, 13, 17, 44, "2f424569f46bad564911250bdcbec91dee2b14fa859d9638bf6e327e1e50941f")),
         Map.entry("Lihd;->ad()Lasaz;", new StreamHook(5, 56, 16, 7, "efedacdedfcbae4a817096e8ac95be0be930ab945be2c2b510da413faf2ac98a")),
         Map.entry("Laosi;->ax(ZLblgy;)V", new StreamHook(6, 143, 17, 25, "e4ecbff5ae5a96fabe48af30a8c27251e06ef06d1c68d60259cc5a402ac5b120")),
-        Map.entry("Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager;->c(Lakui;Lakun;)Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;", new StreamHook(7, 0, 18, 4, "11f3d752e74f3973bb33b78d35edc95b4a4fb7bdd90a7d810c2e30f372cd72d4")));
+        Map.entry("Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager;->c(Lakui;Lakun;)Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;", new StreamHook(7, 0, 18, 4, "11f3d752e74f3973bb33b78d35edc95b4a4fb7bdd90a7d810c2e30f372cd72d4")),
+        Map.entry("Lcom/google/android/apps/youtube/app/watchwhile/MainActivity;->onCreate(Landroid/os/Bundle;)V", new StreamHook(9, 0, 20, 31, "7c6d643ebfcde414937ce88c6e16301e08ee1a209dc63a79a3a7a1d55c53528a")));
     static ClassDef TEMPLATES;
 
     static void require(boolean value, String message) {

@@ -13,6 +13,7 @@
 1	hook:stream:5
 1	hook:stream:6
 1	hook:stream:7
+1	hook:stream:9
 42	string:com.google -> app.revanced
 2	string:com.google.android.c2dm.permission.SEND -> app.revanced.android.c2dm.permission.SEND
 65	string:com.google.android.gms -> app.revanced.android.gms

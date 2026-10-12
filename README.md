@@ -4,13 +4,13 @@ Experimental ad-blocking patch and non-root build tools for the exact **YouTube 
 
 This repository contains the patch/build code and playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**Static checks are separate from runtime testing. Login, playback and actual ad suppression have not been verified on a phone.** This version is outside the checked upstream compatibility list.
+**The user confirmed that opening microG once resolved an immediate launch crash. Playback and actual ad suppression have not been verified.** This version is outside the checked upstream compatibility list.
 
 ## Download and install
 
-Download `YouTube-Ad-Test-21.40.161.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.0-experimental). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is 117.7 MB.
+Download `YouTube-Ad-Test-21.40.161.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.1-startup-check). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is 117.7 MB.
 
-1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test.
+1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test. **Open its microG screen once before launching this app.** Allow it to run in the background; sign-in is handled separately.
 2. Install this project's APK and open **YouTube (Ad test)**.
 3. Sign in yourself through GmsCore if needed; its screen may say **microG**.
 4. Test opening a video, several minutes of playback, seeking, a second video, and whether playback/feed ads appear. Report the exact error and device/Android version if it fails.
@@ -27,9 +27,11 @@ The test package is `app.revanced.android.youtube`, so it can coexist with offic
 | Non-root sign-in | Redirects selected service constants and metadata to ReVanced GmsCore. |
 | Package/resources | Renames the install package and provider authorities, merges five APKs and repairs sparse resource type specifications. |
 
-There is no complete component-ad filter, Shorts-ad guarantee, settings screen or startup GmsCore checker. Casting initialization is bypassed; casting and Android Auto remain untested. Client profiles and server behavior may change.
+There is no complete component-ad filter, Shorts-ad guarantee or settings screen. A startup check now detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start the dependency; it reads no provider values or account data. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Client profiles and server behavior may change.
 
-Static validation preserved all 56,152 original classes and checked 610 added helper classes (56,762 total). All 15 hooks matched. Native-library and asset bytes were compared with the merged original; APK signatures, alignment and ZIP CRCs passed. See [the validation report](evidence/validation.json).
+Static validation preserved all 56,152 original classes and checked 611 added helper classes (56,763 total). All 16 hooks matched. Native-library and asset bytes were compared with the merged original; APK signatures, alignment and ZIP CRCs passed. See [the validation report](evidence/validation.json).
+
+If the app immediately closes, open **ReVanced GmsCore / microG** once and retry. That resolved the reported launch problem on the user's Android 16 phone. If it still closes, a crash report is needed to distinguish a different failure. This observation does not verify playback or ad blocking.
 
 ## Experiment and risks
 

@@ -75,3 +75,10 @@ return-object v0
     :disabled
     return-void
 .end method
+
+# MainActivity p0 is physical v29, before any stock onCreate work.
+.method public static i9()V
+    .registers 31
+    invoke-static/range {v29 .. v29}, Lapp/local/youtube/adblock/GmsStartup;->check(Ljava/lang/Object;)V
+    return-void
+.end method
