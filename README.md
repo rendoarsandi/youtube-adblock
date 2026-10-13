@@ -4,7 +4,7 @@ Experimental ad-blocking patch and non-root build tools for the exact **YouTube 
 
 This repository contains the patch/build code and playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**A launch crash was traced to a feed-hook receiver register and corrected in v0.1.2. Earlier releases contain this defect. Full launch, playback and ad suppression still require device testing.** This version is outside the checked upstream compatibility list.
+**The user confirmed v0.1.2 launches after the feed-register fix; the installed APK digest was checked. Earlier releases contain the crash defect. Playback and ad suppression remain unverified.** This version is outside the checked upstream compatibility list.
 
 ## Download and install
 
