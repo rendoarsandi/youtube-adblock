@@ -1,8 +1,0 @@
-{
-  "protobuf_runtime_sha256": "45d3769189888e491ab7d58125f2014c2a86fb8104c7aa3878c723943fce7a14",
-  "d8_jar_sha256": "a26ee56252adcff6752c379ae255a0ad538ebec60189e078ec6855487107637d",
-  "helper_dex_sha256": "07371a1b59fe6ce9bc967affc35dc929a451b5c7c18aa0717b87f281f745a5de",
-  "helper_dex_bytes": 1134856,
-  "runtime_verified": false,
-  "java_version": "openjdk version \"21.0.12\" 2026-07-21\nOpenJDK Runtime Environment (build 21.0.12)\nOpenJDK 64-Bit Server VM (build 21.0.12, mixed mode)"
-}
