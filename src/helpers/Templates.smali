@@ -57,6 +57,17 @@ sget-object v0, Lcom/google/android/libraries/youtube/media/player/exo2/platypus
 return-object v0
 .end method
 
+# After stock cleanup and before the sole return. Context parameters v23/v24
+# survive the whole guarded method; locals v1/v2 are dead at this location.
+.method public static i8()V
+ .registers 29
+move-object/from16 v1, v23
+move-object/from16 v2, v24
+invoke-static {v0, v1, v2}, Lapp/local/youtube/adblock/DisplayAds;->filter(Lhgo;Lhgt;Lwpp;)Lhgo;
+move-result-object v0
+return-void
+.end method
+
 .method private final streaming(Lbgna;)V
     .registers 9
     if-eqz v8, :disabled

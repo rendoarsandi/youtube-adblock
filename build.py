@@ -124,8 +124,10 @@ def main():
     parser.add_argument("--password-file", type=Path, help="Private file containing the keystore password")
     parser.add_argument("--key-alias", default="local-experiment")
     parser.add_argument("--d8-jar", type=Path, required=True, help="D8 compiler JAR; Termux: $PREFIX/share/java/d8.jar")
+    parser.add_argument("--playback-mode", choices=["native", "compat"], default="native",
+                        help="Keep original playback (default); compat restores the older, unreliable experimental port")
     args = parser.parse_args()
-    required = ["java", "javac", "aapt", "zipalign", "protoc"] + ([] if args.unsigned else ["apksigner", "keytool"])
+    required = ["java", "javac", "jar", "aapt", "zipalign"] + (["protoc"] if args.playback_mode == "compat" else []) + ([] if args.unsigned else ["apksigner", "keytool"])
     for command in required:
         if not shutil.which(command):
             raise RuntimeError(f"Required tool missing: {command}")
@@ -155,12 +157,13 @@ def main():
     helper = output / "helpers.dex"
     run(["java", "-cp", str(classes) + os.pathsep + classpath, "HelperAssembler", ROOT / "src/helpers", helper], output / "helper-assembly.log")
     playback = output / "playback"
-    print("Compiling playback helpers from source...", flush=True)
-    run([sys.executable, ROOT / "src/playback/build_helper.py", "--d8-jar", args.d8_jar.resolve(), "--output-dir", playback], output / "playback-build.log")
+    print("Compiling helpers from source (" + args.playback_mode + " playback)...", flush=True)
+    run([sys.executable, ROOT / "src/playback/build_helper.py", "--d8-jar", args.d8_jar.resolve(), "--output-dir", playback,
+         "--playback-mode", args.playback_mode], output / "playback-build.log")
     built = output / "patched"
     print("Applying hooks and comparing all assembled DEX classes...", flush=True)
     validation = run(["java", "-Xmx1024m", "-cp", str(classes) + os.pathsep + classpath,
-                      "NonRootYoutube", merged, built, helper, playback / "helper-dex/classes.dex"], output / "dex-validation.log")
+                      "NonRootYoutube", merged, built, helper, playback / "helper-dex/classes.dex", args.playback_mode], output / "dex-validation.log")
     if f"Built {PACKAGE}" not in validation or validation.count("Validated assembled classes") != 8:
         raise RuntimeError("Incomplete DEX validation")
     run([sys.executable, ROOT / "tools/fix_resource_specs.py", "--input-dir", staged, "--build-dir", built], output / "resource-repair.log")
@@ -173,9 +176,10 @@ def main():
         key, password, alias = signing_key(args, output)
         run(["apksigner", "sign", "--ks", key, "--ks-key-alias", alias, "--ks-pass", "file:" + str(password), "--out", apk, aligned])
     untouched = validate_package(apk, merged, output, not args.unsigned)
+    metrics = json.loads((built / "build-metrics.json").read_text())
     result = {"package": PACKAGE, "version": "21.40.161", "apk_sha256": sha256(apk), "apk_bytes": apk.stat().st_size,
-              "signed": not args.unsigned, "runtime_verified": False, "startup_dependency_check": True, "original_classes_preserved": 56152, "helper_classes_added": 611, "dex_roundtrip_validated_classes": 56763,
-              "relocated_original_classes": ["Lalic;", "Lakul;"], "hook_count": 16,
+              "signed": not args.unsigned, "runtime_verified": False, "startup_dependency_check": True, "original_classes_preserved": 56152,
+              **metrics, "dex_roundtrip_validated_classes": 56152 + metrics["helper_classes_added"],
               "unchanged_native_library_and_asset_members": untouched}
     (output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     (output / "SHA256SUMS.txt").write_text(result["apk_sha256"] + "  " + apk.name + "\n")

@@ -24,6 +24,11 @@
     "StreamingDataRequest.java": {
       "upstream": "extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof/requests/StreamingDataRequest.java",
       "source_sha256": "9afbd1f354ac4a60b3ed6b94e4e29ef3a88c3aafd29cdd316e8c4eb7bd5f07b4"
+    },
+    "AdsFilter.java": {
+      "upstream": "extensions/youtube/src/main/java/app/revanced/extension/youtube/patches/litho/AdsFilter.java",
+      "source_sha256": "79e3da13455ab7dc4666b65cbcf1053d57b0952c7871e9305ec5670b9ddf1a04",
+      "local_adaptation": "app/local/youtube/adblock/DisplayAdPolicy.java (narrow subset; full upstream source not vendored)"
     }
   }
 }

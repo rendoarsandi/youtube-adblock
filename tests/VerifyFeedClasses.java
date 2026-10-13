@@ -19,6 +19,13 @@ public final class VerifyFeedClasses {
                     System.out.println("FAIL: " + name + " " + failure.getClass().getName() + ": " + failure.getMessage());
                 }
             }
+            if (args.length > 2 && args[2].equals("--display-filter")) {
+                try { VerifyDisplayFilter.run(loader); }
+                catch (Throwable failure) {
+                    failures++;
+                    System.out.println("FAIL: display filter " + failure.getClass().getName() + ": " + failure.getMessage());
+                }
+            }
             if (failures != 0) System.exit(1);
         } catch (Throwable failure) {
             System.out.println("Probe failed: " + failure.getClass().getName() + ": " + failure.getMessage());

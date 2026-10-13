@@ -9,11 +9,22 @@ SHA='45d3769189888e491ab7d58125f2014c2a86fb8104c7aa3878c723943fce7a14'
 def run(args):subprocess.run([str(a) for a in args],check=True)
 def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def main():
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--d8-jar',type=pathlib.Path,required=True);parser.add_argument('--output-dir',type=pathlib.Path,required=True);args=parser.parse_args()
+ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--d8-jar',type=pathlib.Path,required=True);parser.add_argument('--output-dir',type=pathlib.Path,required=True);parser.add_argument('--playback-mode',choices=['native','compat'],default='native');args=parser.parse_args()
  global ROOT
  original=ROOT; ROOT=args.output_dir.resolve();ROOT.mkdir(parents=True,exist_ok=False)
  for folder in ['helper-src','compile-stubs','proto']:shutil.copytree(original/folder,ROOT/folder)
  shutil.copyfile(original/'shade.py',ROOT/'shade.py')
+ if args.playback_mode=='native':
+  classes=ROOT/'helper-classes';classes.mkdir()
+  sources=sorted((ROOT/'helper-src/app/local/youtube/adblock').glob('*.java'))
+  run(['javac','--release','17','-d',classes,*sources])
+  helper_jar=ROOT/'helpers.jar'
+  run(['jar','cf',helper_jar,'-C',classes,'.'])
+  output=ROOT/'helper-dex';output.mkdir()
+  run(['java','-cp',args.d8_jar,'com.android.tools.r8.D8','--min-api','32','--output',output,helper_jar])
+  dex=output/'classes.dex'
+  metadata={'playback_mode':'native','protobuf_runtime_packaged':False,'d8_jar_sha256':digest(args.d8_jar),'helper_dex_sha256':digest(dex),'helper_dex_bytes':dex.stat().st_size,'runtime_verified':False}
+  (ROOT/'helper-build.json').write_text(json.dumps(metadata,indent=2)+'\n');print(json.dumps(metadata,indent=2));return
  runtime=ROOT/'protobuf-javalite-4.35.1.jar'
  if not runtime.exists():runtime.write_bytes(urllib.request.urlopen(URL,timeout=60).read())
  if digest(runtime)!=SHA:raise RuntimeError('Protobuf runtime digest mismatch')

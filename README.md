@@ -2,13 +2,13 @@
 
 Experimental ad-blocking patch and non-root build tools for the exact **YouTube 21.40.161 arm64** APK set extracted from an installed Play Store app.
 
-This repository contains the patch/build code and playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
+This repository contains patch/build code and optional playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**The user confirmed v0.1.2 launches after the feed-register fix; the installed APK digest was checked. Earlier releases contain the crash defect. Playback and ad suppression remain unverified.** This version is outside the checked upstream compatibility list.
+**The user confirmed v0.1.3 plays normally; its installed APK digest matches the release. Ad cards still remain below the video / suggested videos, so display-ad blocking is partial.** The recovery preserves YouTube's original playback code and adds a narrow display-ad filter. The user confirmed that v0.1.2 launches but is laggy and playback starts, then buffers/stops. Earlier releases contain the feed-register crash defect. This version is outside the checked upstream compatibility list.
 
 ## Download and install
 
-Download `YouTube-Ad-Test-21.40.161.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.2-feed-fix). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is 117.7 MB.
+Download `YouTube-RECOVERY-v0.1.3.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.3-native-recovery). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is about 117 MB. `21.40.161` is the original YouTube version; `v0.1.3` is this project's patch revision. Older diagnostic/fix APKs update the same test package and are superseded.
 
 1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test. **Open its microG screen once before launching this app.** Allow it to run in the background; sign-in is handled separately.
 2. Install this project's APK and open **YouTube (Ad test)**.
@@ -23,13 +23,14 @@ The test package is `app.revanced.android.youtube`, so it can coexist with offic
 | --- | --- |
 | Video ads | Returns early from the uniquely matched video-ad trigger loader. |
 | Browse/search ads | Sets the browse/search client OS field to `Android Automotive`, following the upstream request-context approach. |
-| Playback compatibility | Ports upstream request fallback, stream fetch/cache/client logic, streaming-data replacement, POST-body adjustment and selected playback flags; disables SABR. |
+| Display ads | Replaces completed components only for explicit `carousel_ad`, `_ad_with`, `ads_video_with_context` and `watch_metadata_app_promo` patterns; preserves protected video/comment contexts. |
+| Playback recovery | Restores the eight original playback owner classes, including request routing, stream data, POST bodies and feature decisions; excludes the older stream-fetch helpers from the default APK. |
 | Non-root sign-in | Redirects selected service constants and metadata to ReVanced GmsCore. |
 | Package/resources | Renames the install package and provider authorities, merges five APKs and repairs sparse resource type specifications. |
 
-There is no complete component-ad filter, Shorts-ad guarantee or settings screen. A startup check now detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start its provider process; it reads no provider values or account data and does not complete microG’s first-open setup. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Client profiles and server behavior may change.
+There is no complete component-ad filter, Shorts-ad guarantee or settings screen. Unknown components remain visible. A startup check detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start its provider process; it reads no provider values or account data and does not complete microG’s first-open setup. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Server acceptance of the modified app remains unknown.
 
-The regression check uses Android ART to verify both feed classes; it reproduced the old APK’s VerifyErrors and passed both corrected classes. See [the crash-fix evidence](evidence/feed-crash-fix.json). Static validation preserved all 56,152 original classes and checked 611 added helper classes (56,763 total). All 16 hooks matched. Native-library and asset bytes were compared with the merged original; APK signatures, alignment and ZIP CRCs passed. See [the validation report](evidence/validation.json).
+Android ART reproduced the old feed VerifyErrors and accepted the corrected classes. See [the crash-fix evidence](evidence/feed-crash-fix.json). The new actual-APK filter check constructs real component contexts and exercises 14 ad/protected/unknown cases through the component bridge and empty-component factory. It does not prove live ad coverage. The build independently compares all eight playback owner classes with the unmodified input, in addition to serialization, resource, signature, alignment and native-library/asset checks. Current counts and digests are in [the validation report](evidence/validation.json); recovery findings are in [the playback report](docs/playback-recovery.md).
 
 Install v0.1.2 or newer to obtain the feed-register fix. Install and open **ReVanced GmsCore / microG** once before launching this app. The earlier microG workaround did not rule out the now-confirmed bytecode defect. If the corrected build still closes, a crash report is needed to identify the remaining failure.
 
@@ -39,11 +40,13 @@ Crashes, failed login, playback interruptions and incomplete ad blocking are pos
 
 [YouTube's terms](https://www.youtube.com/static?template=terms) restrict modification and reverse engineering, subject to stated exceptions. Compliance, undetectability and freedom from account restrictions are not guaranteed. Google can restrict a service or [disable an entire Google Account](https://support.google.com/accounts/answer/40695?hl=en). A separate account does not guarantee isolation from consequences for other accounts. [YouTube's termination policy](https://support.google.com/youtube/answer/2802168?hl=en) also prohibits circumventing channel termination with another channel.
 
-The playback helper makes requests to Google's YouTube API when the app runs and uses relevant headers supplied by the app, following upstream behavior. Debug logging is disabled; local support shims print generic errors without credentials, headers or request URLs. No account credentials are included in the repository. Do not post passwords, tokens or account data in issues.
+The default recovery build uses YouTube's original network/playback implementation. The optional `compat` build includes the older upstream stream-fetch helper and uses relevant headers supplied by the app; that mode is unreliable and is not the released recovery APK. No account credentials are included in the repository. Do not post passwords, tokens or account data in issues.
+
+The app writes a small local report after about 15 seconds in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.3-local-*.txt`. It records successful display replacements, filter errors, main-looper delay and this app's recent exit reason codes/timestamps. File work runs in the background and stops after 20 snapshots, roughly five minutes. It records no account/provider values, headers, URLs or video IDs and sends no report. Network outcomes are not collected, so this report cannot identify a streaming-server rejection. A pending looper ping alone does not establish a stall. Sessions shorter than 15 seconds may produce no report.
 
 ## Build from source
 
-Requirements: Python 3.11+, JDK 21, `protoc` 35.1, a D8 compiler JAR, `aapt`, `zipalign` supporting `-P 16`, and `apksigner`/`keytool` for signing. Android/Termux is the checked host; other hosts are unverified.
+Requirements: Python 3.11+, JDK 21, a D8 compiler JAR, `aapt`, `zipalign` supporting `-P 16`, and `apksigner`/`keytool` for signing. Android/Termux is the checked host; other hosts are unverified. The optional older `--playback-mode compat` also requires `protoc` 35.1.
 
 Provide your own exact installed APK files in a private directory:
 
@@ -61,7 +64,7 @@ Use `adb shell pm path com.google.android.youtube` to find installed APK paths, 
 python build.py --input-dir /private/path/to/apks --d8-jar /path/to/d8.jar
 ```
 
-On Termux, D8 is normally at `$PREFIX/share/java/d8.jar`. The build downloads pinned ReVanced CLI, APKEditor and protobuf runtime artifacts and verifies SHA-256 before use. It regenerates protobuf classes, compiles the helpers, excludes Android/JSON compilation stubs and shades protobuf to avoid collisions with Google's classes. Source, dependency and build provenance are documented in [the notices](THIRD_PARTY_NOTICES.md).
+On Termux, D8 is normally at `$PREFIX/share/java/d8.jar`. The build downloads pinned ReVanced CLI and APKEditor artifacts and verifies SHA-256 before use. Native playback is the default. Compatibility mode additionally downloads protobuf, regenerates/compiles the older helpers, excludes Android/JSON compilation stubs and shades protobuf to avoid collisions with Google's classes. Source, dependency and build provenance are documented in [the notices](THIRD_PARTY_NOTICES.md).
 
 Outputs and a generated private signing key stay under ignored `.local-build/`. Keep that key private and retain it for compatible future updates. Add `--unsigned` to omit signing, or reuse a private key:
 
@@ -83,7 +86,8 @@ On the Android host, with your own private APK and D8 compiler:
 
 ```bash
 python tests/verify_feed_art.py --apk /private/path/to/built.apk \
-  --d8-jar /path/to/d8.jar --work-dir /private/path/to/new-probe-directory
+  --d8-jar /path/to/d8.jar --work-dir /private/path/to/new-probe-directory \
+  --display-filter
 ```
 
-The check initializes only the actual browse/search endpoint classes, without launching YouTube. Serialization checks alone did not detect the receiver-type bug; this test checks ART's independent acceptance boundary.
+The check verifies the feed/component classes and calls the actual display filter on constructed, unrendered components using Android's system resources context. It does not launch YouTube, construct player requests, access accounts or use the network. Serialization checks alone did not detect the old receiver-type bug; this check uses ART's independent acceptance boundary.

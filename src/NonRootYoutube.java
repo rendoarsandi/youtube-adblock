@@ -53,6 +53,8 @@ public final class NonRootYoutube {
     static final Set<String> APP_AUTHORITIES = new HashSet<>();
     static final Map<String, Integer> CHANGES = new TreeMap<>();
     static final Set<String> SEEN_HOOKS = new HashSet<>();
+    static boolean COMPAT_PLAYBACK;
+    static final Set<String> NATIVE_PLAYBACK_METHODS = new HashSet<>();
     // Original classes4.dex has a full 16-bit method-reference pool. Relocating
     // the patched search endpoint keeps its additional reference out of that pool.
     static final List<ClassDef> RELOCATED = new ArrayList<>();
@@ -76,6 +78,9 @@ public final class NonRootYoutube {
         Map.entry("Laosi;->ax(ZLblgy;)V", new StreamHook(6, 143, 17, 25, "e4ecbff5ae5a96fabe48af30a8c27251e06ef06d1c68d60259cc5a402ac5b120")),
         Map.entry("Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager;->c(Lakui;Lakun;)Lcom/google/android/libraries/youtube/media/player/exo2/platypus/PlatypusEnablingManager$DecisionWithReason;", new StreamHook(7, 0, 18, 4, "11f3d752e74f3973bb33b78d35edc95b4a4fb7bdd90a7d810c2e30f372cd72d4")),
         Map.entry("Lcom/google/android/apps/youtube/app/watchwhile/MainActivity;->onCreate(Landroid/os/Bundle;)V", new StreamHook(9, 0, 20, 31, "7c6d643ebfcde414937ce88c6e16301e08ee1a209dc63a79a3a7a1d55c53528a")));
+    static final String DISPLAY_BUILDER = "Lvin;->a(Lhgt;Lwpp;Lvyj;Ljava/util/List;Lwqk;Z)Lhgo;";
+    static final StreamHook DISPLAY_HOOK = new StreamHook(8, 255, 17, 29,
+        "dfa4001460c2473ac1221776e2c2d862823e718687f814e26479101447ae81af");
     static ClassDef TEMPLATES;
 
     static void require(boolean value, String message) {
@@ -243,6 +248,15 @@ public final class NonRootYoutube {
             updated = feed;
         }
         StreamHook stream = STREAMS.get(id(method));
+        if (stream != null && stream.template() < 8 && !COMPAT_PLAYBACK) {
+            // Native recovery: no redirects, stream replacement, POST deletion,
+            // feature overrides or SABR override. Compare independent original
+            // disassembly against the actual assembled method below.
+            require(!modified && hook == null, "Native playback method was otherwise changed");
+            NATIVE_PLAYBACK_METHODS.add(id(method));
+            stream = null;
+        }
+        if (id(method).equals(DISPLAY_BUILDER)) stream = DISPLAY_HOOK;
         if (stream != null) {
             require(SEEN_HOOKS.add("stream:" + stream.template()), "Duplicate streaming hook");
             require(method.getAccessFlags() == stream.flags() && body.getRegisterCount() == stream.registers(), "Streaming frame changed");
@@ -323,7 +337,7 @@ public final class NonRootYoutube {
             List<Method> direct = new ArrayList<>(), virtual = new ArrayList<>();
             for (Method m : c.getDirectMethods()) direct.add(patch(m));
             for (Method m : c.getVirtualMethods()) virtual.add(patch(m));
-            if (c.getType().equals("Lakul;")) {
+            if (COMPAT_PLAYBACK && c.getType().equals("Lakul;")) {
                 require(direct.stream().noneMatch(m -> m.getName().equals("patch_setStreamingData")), "Streaming bridge already exists");
                 Method bridge = null;
                 for (Method m : TEMPLATES.getDirectMethods()) if (m.getName().equals("streaming")) bridge = m;
@@ -332,7 +346,8 @@ public final class NonRootYoutube {
                     bridge.getAccessFlags(), bridge.getAnnotations(), bridge.getHiddenApiRestrictions(), bridge.getImplementation()));
             }
             ClassDef updatedClass = new ImmutableClassDef(c.getType(), c.getAccessFlags(), c.getSuperclass(), c.getInterfaces(), c.getSourceFile(), c.getAnnotations(), c.getStaticFields(), c.getInstanceFields(), direct, virtual);
-            if ((name.equals("classes4.dex") && c.getType().equals("Lalic;")) || (name.equals("classes2.dex") && c.getType().equals("Lakul;"))) RELOCATED.add(updatedClass);
+            if ((name.equals("classes4.dex") && c.getType().equals("Lalic;"))
+                || (name.equals("classes2.dex") && (c.getType().equals("Lvin;") || (COMPAT_PLAYBACK && c.getType().equals("Lakul;"))))) RELOCATED.add(updatedClass);
             else expectedClasses.add(updatedClass);
         }
         ImmutableDexFile expected = new ImmutableDexFile(before.getOpcodes(), expectedClasses);
@@ -349,12 +364,25 @@ public final class NonRootYoutube {
                 Files.writeString(output.resolve("mismatch-actual.smali"), found);
                 throw new IllegalStateException("Round-trip differs: " + c.getType());
             }
+            if (!COMPAT_PLAYBACK) {
+                // Stronger than comparing two patched representations: for the
+                // eight playback owners, compare the serialized class with the
+                // unmodified input class. Native mode has no observer injection.
+                boolean ownsPlayback = STREAMS.keySet().stream().anyMatch(key ->
+                    key.startsWith(c.getType() + "->") && STREAMS.get(key).template() < 8);
+                if (ownsPlayback) {
+                    ClassDef inputClass = before.getClasses().stream().filter(x -> x.getType().equals(c.getType())).findFirst().orElseThrow();
+                    require(render(inputClass).equals(found), "Native playback class differs from original: " + c.getType());
+                }
+            }
             if (c.getType().equals("Lacpe;") || c.getType().equals("Lsye;") || c.getType().equals("Lzvu;") || c.getType().equals("Lanca;")) Files.writeString(output.resolve(c.getType().substring(1,c.getType().length()-1) + ".smali"), render(a));
         }
         module.add(new ByteInputSource(Files.readAllBytes(dexPath), name));
         System.out.println("Validated assembled " + name + ": " + actualClasses.size() + " classes.");
     }
     public static void main(String[] args) throws Exception {
+        require(args.length == 5 && Set.of("native", "compat").contains(args[4]), "Specify native or compat playback mode");
+        COMPAT_PLAYBACK = args[4].equals("compat");
         Path output = Path.of(args[1]).toAbsolutePath(); require(!Files.exists(output), "Output directory exists"); Files.createDirectories(output);
         try (ApkModule module = ApkModule.loadApkFile(Path.of(args[0]).toFile()); ZipFile zip = new ZipFile(args[0])) {
             DexBackedDexFile smaliHelpers = new DexBackedDexFile(null, Files.readAllBytes(Path.of(args[2])));
@@ -389,7 +417,8 @@ public final class NonRootYoutube {
                 if (helper.getType().equals("Lapp/local/youtube/adblock/FeedAds;")) feedFound = true;
             }
             require(feedFound, "Feed helper absent");
-            require(RELOCATED.size() == 2 && new HashSet<>(RELOCATED.stream().map(ClassDef::getType).toList()).equals(Set.of("Lalic;", "Lakul;")), "Unexpected relocated class set");
+            Set<String> relocatedTypes = COMPAT_PLAYBACK ? Set.of("Lalic;", "Lakul;", "Lvin;") : Set.of("Lalic;", "Lvin;");
+            require(RELOCATED.size() == relocatedTypes.size() && new HashSet<>(RELOCATED.stream().map(ClassDef::getType).toList()).equals(relocatedTypes), "Unexpected relocated class set");
             combined.addAll(RELOCATED);
             Path combinedPath = output.resolve("classes9.dex");
             DexPool.writeTo(combinedPath.toString(), new ImmutableDexFile(helpers.getOpcodes(), combined));
@@ -399,10 +428,17 @@ public final class NonRootYoutube {
             require(classes.size() == combined.size(), "Combined helper class count differs");
             for (ClassDef c : combined) require(classes.containsKey(c.getType()) && render(c).equals(render(classes.get(c.getType()))), "Combined helper serialization differs " + c.getType());
             module.add(new ByteInputSource(Files.readAllBytes(combinedPath), "classes9.dex"));
-            System.out.println("Validated helper classes9.dex: " + classes.size() + " classes, including two relocated classes.");
+            System.out.println("Validated helper classes9.dex: " + classes.size() + " classes, including " + RELOCATED.size() + " relocated classes.");
             Set<String> expectedHooks = new HashSet<>(HOOKS.values());
-            for (StreamHook stream : STREAMS.values()) expectedHooks.add("stream:" + stream.template());
+            for (StreamHook stream : STREAMS.values()) if (COMPAT_PLAYBACK || stream.template() == 9) expectedHooks.add("stream:" + stream.template());
+            expectedHooks.add("stream:8");
             require(SEEN_HOOKS.equals(expectedHooks), "Missing hooks " + SEEN_HOOKS);
+            require(COMPAT_PLAYBACK || NATIVE_PLAYBACK_METHODS.size() == 8, "Missing original native playback owners");
+            Files.writeString(output.resolve("build-metrics.json"), "{\"playback_mode\":\"" + args[4]
+                + "\",\"helper_classes_added\":" + (combined.size() - RELOCATED.size())
+                + ",\"hook_count\":" + SEEN_HOOKS.size()
+                + ",\"original_playback_classes_compared\":" + (COMPAT_PLAYBACK ? 0 : 8)
+                + ",\"relocated_original_classes\":[" + String.join(",", relocatedTypes.stream().sorted().map(x -> "\"" + x + "\"").toList()) + "]}\n");
             module.setApkSignatureBlock(null); module.removeInputSource("stamp-cert-sha256");
             for (com.reandroid.archive.InputSource input : module.listInputSources()) {
                 if (input.getAlias().matches("META-INF/(?:MANIFEST\\.MF|[^/]+\\.(?:SF|RSA|DSA|EC))")) module.removeInputSource(input.getAlias());
