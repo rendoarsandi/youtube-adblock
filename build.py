@@ -30,6 +30,8 @@ DEPENDENCIES = {
         "a9cd40df818845456be6d696de6110c89edf4b0a0580cb83438ed6b25a366e67"),
 }
 PACKAGE = "app.revanced.android.youtube"
+PATCH_VERSION = "v0.1.4"
+COMPANION_LAYOUTS = {"res/QWG.xml", "res/QgJ.xml"}
 
 
 def sha256(path):
@@ -88,6 +90,12 @@ def validate_package(apk, merged, output, signed):
         for name in untouched:
             if before.read(name) != after.read(name):
                 raise RuntimeError(f"Unexpected native-library or asset change: {name}")
+        original_resources = {name for name in before.namelist() if name.startswith("res/")}
+        if original_resources != {name for name in after.namelist() if name.startswith("res/")}:
+            raise RuntimeError("Resource member inventory changed")
+        changed_resources = {name for name in original_resources if before.read(name) != after.read(name)}
+        if changed_resources != COMPANION_LAYOUTS:
+            raise RuntimeError(f"Unexpected resource changes: {sorted(changed_resources)}")
     return len(untouched)
 
 
@@ -153,7 +161,7 @@ def main():
     classes = output / "builder-classes"
     classes.mkdir()
     classpath = os.pathsep.join(str(path) for path in jars)
-    run(["javac", "-cp", classpath, "-d", classes, ROOT / "src/NonRootYoutube.java", ROOT / "src/HelperAssembler.java"], output / "compile.log")
+    run(["javac", "-cp", classpath, "-d", classes, *sorted((ROOT / "src").glob("*.java"))], output / "compile.log")
     helper = output / "helpers.dex"
     run(["java", "-cp", str(classes) + os.pathsep + classpath, "HelperAssembler", ROOT / "src/helpers", helper], output / "helper-assembly.log")
     playback = output / "playback"
@@ -169,7 +177,7 @@ def main():
     run([sys.executable, ROOT / "tools/fix_resource_specs.py", "--input-dir", staged, "--build-dir", built], output / "resource-repair.log")
     aligned = output / "aligned.apk"
     run(["zipalign", "-P", "16", "4", built / "app-resources-fixed.apk", aligned])
-    apk = output / ("YouTube-Ad-Test-21.40.161-unsigned.apk" if args.unsigned else "YouTube-Ad-Test-21.40.161.apk")
+    apk = output / (f"YouTube-Adblock-{PATCH_VERSION}-unsigned.apk" if args.unsigned else f"YouTube-Adblock-{PATCH_VERSION}.apk")
     if args.unsigned:
         shutil.copyfile(aligned, apk)
     else:
@@ -177,10 +185,10 @@ def main():
         run(["apksigner", "sign", "--ks", key, "--ks-key-alias", alias, "--ks-pass", "file:" + str(password), "--out", apk, aligned])
     untouched = validate_package(apk, merged, output, not args.unsigned)
     metrics = json.loads((built / "build-metrics.json").read_text())
-    result = {"package": PACKAGE, "version": "21.40.161", "apk_sha256": sha256(apk), "apk_bytes": apk.stat().st_size,
+    result = {"package": PACKAGE, "version": "21.40.161", "patch_version": PATCH_VERSION, "apk_sha256": sha256(apk), "apk_bytes": apk.stat().st_size,
               "signed": not args.unsigned, "runtime_verified": False, "startup_dependency_check": True, "original_classes_preserved": 56152,
               **metrics, "dex_roundtrip_validated_classes": 56152 + metrics["helper_classes_added"],
-              "unchanged_native_library_and_asset_members": untouched}
+              "unchanged_native_library_and_asset_members": untouched, "changed_companion_layouts": sorted(COMPANION_LAYOUTS)}
     (output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     (output / "SHA256SUMS.txt").write_text(result["apk_sha256"] + "  " + apk.name + "\n")
     print(f"Built and statically validated: {apk}\nLogin, playback and ad blocking remain unverified.")

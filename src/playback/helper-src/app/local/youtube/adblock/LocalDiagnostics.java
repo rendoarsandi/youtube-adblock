@@ -19,11 +19,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class LocalDiagnostics {
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicLong HIDDEN = new AtomicLong();
+    private static final AtomicLong SHORTS_FILTERED = new AtomicLong();
     private static final AtomicLong FAILED = new AtomicLong();
     private static final AtomicLong MAX_DELAY = new AtomicLong();
     private static final AtomicBoolean PING_PENDING = new AtomicBoolean();
 
     public static void adHidden() { HIDDEN.incrementAndGet(); }
+    public static void shortsEntriesFiltered(int count) { SHORTS_FILTERED.addAndGet(count); }
     public static void filterFailed() { FAILED.incrementAndGet(); }
 
     public static void initialize(Object activity) {
@@ -38,15 +40,16 @@ public final class LocalDiagnostics {
                 return thread;
             });
             final long started = System.currentTimeMillis();
-            final String name = "YouTube-v0.1.3-local-" + started + ".txt";
+            final String name = "YouTube-v0.1.4-local-" + started + ".txt";
             final Object[] downloadUri = {null};
             final int[] ticks = {0};
             worker.scheduleWithFixedDelay(() -> {
                 try {
                     pingMainLooper();
-                    String report = "build=v0.1.3\n"
+                    String report = "build=v0.1.4\n"
                         + "elapsed_ms=" + (System.currentTimeMillis() - started) + "\n"
                         + "display_ads_replaced=" + HIDDEN.get() + "\n"
+                        + "shorts_entries_filtered=" + SHORTS_FILTERED.get() + "\n"
                         + "display_filter_errors=" + FAILED.get() + "\n"
                         + "max_main_looper_delay_ms=" + MAX_DELAY.get() + "\n"
                         + "main_looper_ping_pending=" + PING_PENDING.get() + "\n"

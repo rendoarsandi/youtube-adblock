@@ -4,11 +4,11 @@ Experimental ad-blocking patch and non-root build tools for the exact **YouTube 
 
 This repository contains patch/build code and optional playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**The user confirmed v0.1.3 plays normally; its installed APK digest matches the release. Ad cards still remain below the video / suggested videos, so display-ad blocking is partial.** The recovery preserves YouTube's original playback code and adds a narrow display-ad filter. The user confirmed that v0.1.2 launches but is laggy and playback starts, then buffers/stops. Earlier releases contain the feed-register crash defect. This version is outside the checked upstream compatibility list.
+**v0.1.4 adds targeted below-player card and sponsored-Shorts filtering and passes the Android artifact checks. Live coverage needs device testing.** The user confirmed v0.1.3 plays normally, but ad cards and separate sponsored Shorts remain. The default build preserves that version's original playback code. v0.1.2 buffered/stopped; earlier builds had a feed-register crash. This YouTube version is outside the checked upstream compatibility list.
 
 ## Download and install
 
-Download `YouTube-Adblock-v0.1.3.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.3). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum and validation report. The APK is about 117 MB. `21.40.161` is the original YouTube version; `v0.1.3` is this project's patch revision. Older diagnostic/fix APKs update the same test package and are superseded.
+Download `YouTube-Adblock-v0.1.4.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.4). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum; update details are in the release description. The APK is about 117 MB. `21.40.161` is the original YouTube version; `v0.1.4` is this project's patch revision. Older diagnostic/fix APKs update the same test package and are superseded.
 
 1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test. **Open its microG screen once before launching this app.** Allow it to run in the background; sign-in is handled separately.
 2. Install this project's APK and open **YouTube (Ad test)**.
@@ -24,13 +24,15 @@ The test package is `app.revanced.android.youtube`, so it can coexist with offic
 | Video ads | Returns early from the uniquely matched video-ad trigger loader. |
 | Browse/search ads | Sets the browse/search client OS field to `Android Automotive`, following the upstream request-context approach. |
 | Display ads | Replaces completed components only for explicit `carousel_ad`, `_ad_with`, `ads_video_with_context` and `watch_metadata_app_promo` patterns; preserves protected video/comment contexts. |
+| Companion ad cards | Collapses the dedicated legacy and Elements ad-container stubs, preserving the mixed parent layout and ad callbacks. |
+| Sponsored Shorts | Uses native video/image ad classification before dynamic insertion, feed-list assembly and seed construction. Commands and their tracking entries remain paired. |
 | Playback recovery | Restores the eight original playback owner classes, including request routing, stream data, POST bodies and feature decisions; excludes the older stream-fetch helpers from the default APK. |
 | Non-root sign-in | Redirects selected service constants and metadata to ReVanced GmsCore. |
 | Package/resources | Renames the install package and provider authorities, merges five APKs and repairs sparse resource type specifications. |
 
-There is no complete component-ad filter, Shorts-ad guarantee or settings screen. Unknown components remain visible. A startup check detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start its provider process; it reads no provider values or account data and does not complete microG’s first-open setup. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Server acceptance of the modified app remains unknown.
+There is no complete component-ad filter or settings screen. The targeted card and Shorts changes do not guarantee every server-delivered ad is covered. Unknown components remain visible. A startup check detects missing/disabled GmsCore and opens installation/settings guidance. It also briefly acquires and closes GmsCore’s public service provider to start its provider process; it reads no provider values or account data and does not complete microG’s first-open setup. This does not guarantee that permissions, background restrictions or sign-in are ready. Casting initialization is bypassed; casting and Android Auto remain untested. Server acceptance of the modified app remains unknown.
 
-Android ART reproduced the old feed VerifyErrors and accepted the corrected classes. The new actual-APK filter check constructs real component contexts and exercises 14 ad/protected/unknown cases through the component bridge and empty-component factory. It does not prove live ad coverage. The build independently compares all eight playback owner classes with the unmodified input, in addition to serialization, resource, signature, alignment and native-library/asset checks. Recovery findings are in [the playback report](docs/playback-recovery.md).
+Android ART reproduced the old feed VerifyErrors and accepted the corrected classes. The new actual-APK filter check constructs real component contexts and exercises 14 ad/protected/unknown cases through the component bridge and empty-component factory. It does not prove live ad coverage. The build independently compares all eight playback owner classes with the unmodified input, in addition to serialization, resource, signature, alignment and native-library/asset checks. Android ART checks also exercise native Shorts seed constructors with video/image ad fixtures and paired tracking, and resolves the compiled companion layouts. These checks do not establish live ad coverage. Recovery findings are in [the playback report](docs/playback-recovery.md).
 
 Install v0.1.2 or newer to obtain the feed-register fix. Install and open **ReVanced GmsCore / microG** once before launching this app. The earlier microG workaround did not rule out the now-confirmed bytecode defect. If the corrected build still closes, a crash report is needed to identify the remaining failure.
 
@@ -42,7 +44,7 @@ Crashes, failed login, playback interruptions and incomplete ad blocking are pos
 
 The default recovery build uses YouTube's original network/playback implementation. The optional `compat` build includes the older upstream stream-fetch helper and uses relevant headers supplied by the app; that mode is unreliable and is not the released recovery APK. No account credentials are included in the repository. Do not post passwords, tokens or account data in issues.
 
-The app writes a small local report after about 15 seconds in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.3-local-*.txt`. It records successful display replacements, filter errors, main-looper delay and this app's recent exit reason codes/timestamps. File work runs in the background and stops after 20 snapshots, roughly five minutes. It records no account/provider values, headers, URLs or video IDs and sends no report. Network outcomes are not collected, so this report cannot identify a streaming-server rejection. A pending looper ping alone does not establish a stall. Sessions shorter than 15 seconds may produce no report.
+The app writes a small local report after about 15 seconds in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.4-local-*.txt`. It records successful display replacements, removed Shorts entries, display-filter errors, main-looper delay and this app's recent exit reason codes/timestamps. The Shorts count is entries removed across filtering boundaries, not a count of unique advertisements. File work runs in the background and stops after 20 snapshots, roughly five minutes. It records no account/provider values, headers, URLs or video IDs and sends no report. Network outcomes are not collected, so this report cannot identify a streaming-server rejection. A pending looper ping alone does not establish a stall. Sessions shorter than 15 seconds may produce no report.
 
 ## Build from source
 
@@ -74,7 +76,7 @@ python build.py --input-dir /private/path/to/apks --d8-jar /path/to/d8.jar \
   --password-file /private/path/password.txt --key-alias local-experiment
 ```
 
-`src/NonRootYoutube.java` applies guarded DEX/manifest changes; `src/helpers/` contains locally authored bridges; `src/playback/` contains vendored upstream playback sources, proto definitions and local support code. `build.py` orchestrates the build and static verification; `tools/fix_resource_specs.py` repairs resource provenance. [Findings](docs/findings.md) distinguish observations, inferences and unknowns.
+`src/NonRootYoutube.java` applies guarded DEX/manifest changes; `src/CompanionLayouts.java` modifies the two dedicated companion resources; `src/helpers/` contains locally authored bridges; `src/playback/` contains vendored upstream playback sources, proto definitions and local support code. `build.py` orchestrates the build and static verification; `tools/fix_resource_specs.py` repairs resource provenance. [Findings](docs/findings.md) distinguish observations, inferences and unknowns.
 
 ## License
 
@@ -87,7 +89,16 @@ On the Android host, with your own private APK and D8 compiler:
 ```bash
 python tests/verify_feed_art.py --apk /private/path/to/built.apk \
   --d8-jar /path/to/d8.jar --work-dir /private/path/to/new-probe-directory \
-  --display-filter
+  --display-filter --shorts-filter \
+  --original-apk /private/path/to/merged-original.apk
 ```
 
-The check verifies the feed/component classes and calls the actual display filter on constructed, unrendered components using Android's system resources context. It does not launch YouTube, construct player requests, access accounts or use the network. Serialization checks alone did not detect the old receiver-type bug; this check uses ART's independent acceptance boundary.
+The Shorts option first checks the same seed assertion against the original APK, where retaining sponsored entries must fail, then against the patched APK. The check verifies the feed/component/Shorts classes and calls the actual display filter on constructed, unrendered components using Android's system resources context. It does not launch YouTube, construct player requests, access accounts or use the network. Serialization checks alone did not detect the old receiver-type bug; this check uses ART's independent acceptance boundary.
+
+The independent compiled companion-layout check runs with:
+
+```bash
+python tests/verify_companion_art.py --apk /private/path/to/built.apk \
+  --d8-jar /path/to/d8.jar --work-dir /private/path/to/new-layout-probe-directory \
+  --baseline /private/path/to/previous-build.apk
+```

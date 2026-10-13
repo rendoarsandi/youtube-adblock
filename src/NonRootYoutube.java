@@ -81,7 +81,103 @@ public final class NonRootYoutube {
     static final String DISPLAY_BUILDER = "Lvin;->a(Lhgt;Lwpp;Lvyj;Ljava/util/List;Lwqk;Z)Lhgo;";
     static final StreamHook DISPLAY_HOOK = new StreamHook(8, 255, 17, 29,
         "dfa4001460c2473ac1221776e2c2d862823e718687f814e26479101447ae81af");
+    static final String SHORTS_HELPER = "Lapp/local/youtube/adblock/ShortsAds;";
+    static final Map<String, String> SHORTS_HOOKS = Map.of(
+        "Lasxq;->ad(JLjava/util/List;I)Z", "shorts:insert",
+        "Lasxq;->ab(Ljava/util/List;Lbgfo;IZ)V", "shorts:feed",
+        "Lasyd;->d(Lasya;Lbgfr;JZ)V", "shorts:refresh",
+        "Lasrd;-><init>(Lbdfp;)V", "shorts:seed-single",
+        "Lasrd;-><init>(Ljava/util/List;Ljava/util/List;)V", "shorts:seed-pair");
+    record ExactGuard(int flags, int registers, int units, int tries, String digest) {}
+    static final Map<String, ExactGuard> SHORTS_GUARDS = Map.of(
+        "Lasxq;->ad(JLjava/util/List;I)Z", new ExactGuard(17, 9, 144, 2, "9a913f495e1d820ee865988d6c06547173e0aad15fd1f78e0d89c555333917a6"),
+        "Lasxq;->ab(Ljava/util/List;Lbgfo;IZ)V", new ExactGuard(17, 16, 268, 0, "e7cb36dc53483e741d8c0555829d7915f0787c776123725d959420b0164b2bdf"),
+        "Lasyd;->d(Lasya;Lbgfr;JZ)V", new ExactGuard(17, 43, 940, 6, "5ef8f84eaf7679b9e24e5813aa75b11e5db1a1f4298897d56e4d5263e6f5aa3f"),
+        "Lasrd;-><init>(Lbdfp;)V", new ExactGuard(65537, 5, 45, 0, "0b9b5f06d131a7d71357a0f49fcac160a6c9b7a05d59f24fb18eb51acf74423c"),
+        "Lasrd;-><init>(Ljava/util/List;Ljava/util/List;)V", new ExactGuard(65537, 3, 54, 0, "72f4e202e9cf4ef3f403d8cdde7e9943e1725b3c74ad9623c444a6cdab70c558"),
+        "Laqpp;->ad(Lbdfp;)Z", new ExactGuard(9, 3, 40, 0, "6f7c919cc6ae5328a38577841c48a63148975d08123957dcca3687b98a45848c"),
+        "Laqpp;->J(Lbktv;)Z", new ExactGuard(9, 5, 52, 0, "f83a906e235f69f30c9941d0e506e9ad2ab4ce9a48b252a8efa0e317e4a59a2f"),
+        "Laqpp;->I(Lbkrv;)Z", new ExactGuard(9, 3, 79, 0, "e5507f2310d4e4f46d94f2db808e7113a92f48157582df0c7c00bc9aaa28334d"));
+    static final Set<String> SHORTS_GUARDS_SEEN = new HashSet<>();
     static ClassDef TEMPLATES;
+
+    static int instructionIndex(List<? extends Instruction> instructions, int address) {
+        int offset = 0;
+        for (int i = 0; i < instructions.size(); i++) {
+            if (offset == address) return i;
+            offset += instructions.get(i).getCodeUnits();
+        }
+        throw new IllegalStateException("Not an instruction boundary: " + address);
+    }
+    static void guardShorts(Method method, List<Instruction> instructions) throws java.security.NoSuchAlgorithmException {
+        ExactGuard guard = SHORTS_GUARDS.get(id(method));
+        if (guard == null) return;
+        MethodImplementation body = method.getImplementation();
+        int units = instructions.stream().mapToInt(Instruction::getCodeUnits).sum();
+        require(method.getAccessFlags() == guard.flags() && body.getRegisterCount() == guard.registers()
+            && units == guard.units() && body.getTryBlocks().size() == guard.tries(), "Shorts frame changed: " + id(method));
+        DexBackedInstruction first = (DexBackedInstruction)instructions.get(0);
+        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+            first.dexFile.getDataBuffer().readByteRange(first.instructionStart, units * 2)));
+        require(digest.equals(guard.digest()), "Shorts instruction digest changed: " + id(method));
+        require(SHORTS_GUARDS_SEEN.add(id(method)), "Duplicate Shorts guard");
+    }
+    static void prefix(MutableMethodImplementation body, int index, List<BuilderInstruction> injected) {
+        BuilderInstruction displaced = body.getInstructions().get(index);
+        body.replaceInstruction(index, injected.get(0));
+        for (int i = 1; i < injected.size(); i++) body.addInstruction(index + i, injected.get(i));
+        body.addInstruction(index + injected.size(), displaced);
+    }
+    static MethodImplementation patchShorts(Method method, MethodImplementation body, String hook) {
+        ImmutableMethodReference skip = new ImmutableMethodReference(SHORTS_HELPER, "skip", List.of("Lbdfp;"), "Z");
+        if (hook.equals("shorts:insert")) {
+            MutableMethodImplementation result = new MutableMethodImplementation(body);
+            prefix(result, 0, List.of(
+                new BuilderInstruction35c(Opcode.INVOKE_STATIC, 1, 7, 0, 0, 0, 0,
+                    new ImmutableMethodReference(SHORTS_HELPER, "filter", List.of("Ljava/util/List;"), "Ljava/util/List;")),
+                new BuilderInstruction11x(Opcode.MOVE_RESULT_OBJECT, 7)));
+            return result;
+        }
+        if (hook.equals("shorts:feed") || hook.equals("shorts:refresh")) {
+            boolean feed = hook.equals("shorts:feed");
+            MutableMethodImplementation result = new MutableMethodImplementation(body);
+            int site = instructionIndex(result.getInstructions(), feed ? 62 : 148);
+            int loop = instructionIndex(result.getInstructions(), feed ? 22 : 97);
+            require(result.getInstructions().get(site).getOpcode() == Opcode.INVOKE_INTERFACE
+                && ((ReferenceInstruction)result.getInstructions().get(site)).getReference().toString()
+                    .equals("Ljava/util/List;->add(Ljava/lang/Object;)Z"), "Shorts paired append changed");
+            Label next = result.newLabelForIndex(loop);
+            prefix(result, site, List.of(
+                new BuilderInstruction35c(Opcode.INVOKE_STATIC, 1, feed ? 3 : 5, 0, 0, 0, 0, skip),
+                new BuilderInstruction11x(Opcode.MOVE_RESULT, feed ? 4 : 9),
+                new BuilderInstruction21t(Opcode.IF_NEZ, feed ? 4 : 9, next)));
+            return result;
+        }
+        // Keep the actual receiver above every original register. Both seed
+        // constructors overwrite their old input slots before returning.
+        int registers = body.getRegisterCount(), inputs = hook.equals("shorts:seed-single") ? 2 : 3;
+        MutableMethodImplementation result = new MutableMethodImplementation(new ImmutableMethodImplementation(
+            registers + inputs, body.getInstructions(), body.getTryBlocks(), body.getDebugItems()));
+        int returns = 0;
+        for (int i = result.getInstructions().size() - 1; i >= 0; i--) {
+            if (result.getInstructions().get(i).getOpcode() != Opcode.RETURN_VOID) continue;
+            prefix(result, i, List.of(
+                new BuilderInstruction35c(Opcode.INVOKE_STATIC, 1, registers, 0, 0, 0, 0,
+                    new ImmutableMethodReference(SHORTS_HELPER, "filterSeed", List.of("Lasrd;"), "[Ljava/util/List;")),
+                new BuilderInstruction11x(Opcode.MOVE_RESULT_OBJECT, 0),
+                new BuilderInstruction11n(Opcode.CONST_4, 1, 0),
+                new BuilderInstruction23x(Opcode.AGET_OBJECT, 2, 0, 1),
+                new BuilderInstruction22c(Opcode.IPUT_OBJECT, 2, registers, new ImmutableFieldReference("Lasrd;", "a", "Ljava/util/List;")),
+                new BuilderInstruction11n(Opcode.CONST_4, 1, 1),
+                new BuilderInstruction23x(Opcode.AGET_OBJECT, 2, 0, 1),
+                new BuilderInstruction22c(Opcode.IPUT_OBJECT, 2, registers, new ImmutableFieldReference("Lasrd;", "b", "Ljava/util/List;"))));
+            returns++;
+        }
+        require(returns == 1, "Shorts constructor return count changed");
+        for (int i = inputs - 1; i >= 0; i--) result.addInstruction(0,
+            new BuilderInstruction12x(Opcode.MOVE_OBJECT, registers - inputs + i, registers + i));
+        return result;
+    }
 
     static void require(boolean value, String message) {
         if (!value) throw new IllegalStateException(message);
@@ -163,6 +259,9 @@ public final class NonRootYoutube {
         if (body == null) return ImmutableMethod.of(method);
         String hook = HOOKS.get(id(method));
         List<Instruction> original = new ArrayList<>(); body.getInstructions().forEach(original::add);
+        try { guardShorts(method, original); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+        String shortsHook = SHORTS_HOOKS.get(id(method));
         Set<String> strings = new HashSet<>(); for (Instruction i : original) { String s = string(i); if (s != null) strings.add(s); }
         if (hook != null) {
             require(SEEN_HOOKS.add(hook), "Duplicate hook " + hook);
@@ -247,6 +346,12 @@ public final class NonRootYoutube {
             require(returns == 1, "Unexpected feed return count");
             updated = feed;
         }
+        if (shortsHook != null) {
+            require(SEEN_HOOKS.add(shortsHook), "Duplicate Shorts hook");
+            require(!modified && hook == null, "Shorts target was otherwise changed");
+            updated = patchShorts(method, updated, shortsHook);
+            count("hook:" + shortsHook);
+        }
         StreamHook stream = STREAMS.get(id(method));
         if (stream != null && stream.template() < 8 && !COMPAT_PLAYBACK) {
             // Native recovery: no redirects, stream replacement, POST deletion,
@@ -290,7 +395,7 @@ public final class NonRootYoutube {
             updated = mutable;
             count("hook:stream:" + stream.template());
         }
-        if (!modified && hook == null && stream == null) return ImmutableMethod.of(method);
+        if (!modified && hook == null && stream == null && shortsHook == null) return ImmutableMethod.of(method);
         return new ImmutableMethod(method.getDefiningClass(), method.getName(), method.getParameters(), method.getReturnType(),
             method.getAccessFlags(), method.getAnnotations(), method.getHiddenApiRestrictions(), updated);
     }
@@ -347,6 +452,7 @@ public final class NonRootYoutube {
             }
             ClassDef updatedClass = new ImmutableClassDef(c.getType(), c.getAccessFlags(), c.getSuperclass(), c.getInterfaces(), c.getSourceFile(), c.getAnnotations(), c.getStaticFields(), c.getInstanceFields(), direct, virtual);
             if ((name.equals("classes4.dex") && c.getType().equals("Lalic;"))
+                || (name.equals("classes6.dex") && Set.of("Lasxq;", "Lasrd;").contains(c.getType()))
                 || (name.equals("classes2.dex") && (c.getType().equals("Lvin;") || (COMPAT_PLAYBACK && c.getType().equals("Lakul;"))))) RELOCATED.add(updatedClass);
             else expectedClasses.add(updatedClass);
         }
@@ -389,6 +495,7 @@ public final class NonRootYoutube {
             for (ClassDef c : smaliHelpers.getClasses()) if (c.getType().equals("Lapp/local/youtube/adblock/Templates;")) TEMPLATES = c;
             require(TEMPLATES != null, "Streaming templates absent");
             patchManifest(module);
+            CompanionLayouts.patch(module, zip);
             List<String> dexFiles = zip.stream().map(ZipEntry::getName).filter(n -> n.matches("classes(?:[2-9][0-9]*)?\\.dex")).sorted().toList();
             require(dexFiles.size() == 8, "Unexpected DEX count");
             Set<String> originalTypes = new HashSet<>();
@@ -417,7 +524,7 @@ public final class NonRootYoutube {
                 if (helper.getType().equals("Lapp/local/youtube/adblock/FeedAds;")) feedFound = true;
             }
             require(feedFound, "Feed helper absent");
-            Set<String> relocatedTypes = COMPAT_PLAYBACK ? Set.of("Lalic;", "Lakul;", "Lvin;") : Set.of("Lalic;", "Lvin;");
+            Set<String> relocatedTypes = COMPAT_PLAYBACK ? Set.of("Lalic;", "Lakul;", "Lvin;", "Lasxq;", "Lasrd;") : Set.of("Lalic;", "Lvin;", "Lasxq;", "Lasrd;");
             require(RELOCATED.size() == relocatedTypes.size() && new HashSet<>(RELOCATED.stream().map(ClassDef::getType).toList()).equals(relocatedTypes), "Unexpected relocated class set");
             combined.addAll(RELOCATED);
             Path combinedPath = output.resolve("classes9.dex");
@@ -430,9 +537,11 @@ public final class NonRootYoutube {
             module.add(new ByteInputSource(Files.readAllBytes(combinedPath), "classes9.dex"));
             System.out.println("Validated helper classes9.dex: " + classes.size() + " classes, including " + RELOCATED.size() + " relocated classes.");
             Set<String> expectedHooks = new HashSet<>(HOOKS.values());
+            expectedHooks.addAll(SHORTS_HOOKS.values());
             for (StreamHook stream : STREAMS.values()) if (COMPAT_PLAYBACK || stream.template() == 9) expectedHooks.add("stream:" + stream.template());
             expectedHooks.add("stream:8");
             require(SEEN_HOOKS.equals(expectedHooks), "Missing hooks " + SEEN_HOOKS);
+            require(SHORTS_GUARDS_SEEN.equals(SHORTS_GUARDS.keySet()), "Missing Shorts guards");
             require(COMPAT_PLAYBACK || NATIVE_PLAYBACK_METHODS.size() == 8, "Missing original native playback owners");
             Files.writeString(output.resolve("build-metrics.json"), "{\"playback_mode\":\"" + args[4]
                 + "\",\"helper_classes_added\":" + (combined.size() - RELOCATED.size())
