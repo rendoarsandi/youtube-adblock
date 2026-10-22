@@ -19,16 +19,19 @@ def main():
     parser.add_argument("--work-dir", type=Path, required=True, help="New private directory for probe outputs")
     parser.add_argument("--display-filter", action="store_true", help="Also verify the actual narrow component filter and its policy")
     parser.add_argument("--shorts-filter", action="store_true", help="Verify native Shorts fixtures, actual seed regression, and insertion owners")
+    parser.add_argument("--background-playback", action="store_true", help="Verify the actual player's background eligibility and no-video guard")
     parser.add_argument("--original-apk", type=Path, help="Original APK for the intended pre-fix Shorts regression")
     args = parser.parse_args()
-    if args.shorts_filter and args.original_apk is None:
-        parser.error("--shorts-filter requires --original-apk for the before/after regression")
+    if (args.shorts_filter or args.background_playback) and args.original_apk is None:
+        parser.error("Shorts/background checks require --original-apk for the before/after regression")
     work = args.work_dir.resolve()
     work.mkdir(parents=True, exist_ok=False)
     apk = work / "target.apk"
     shutil.copyfile(args.apk, apk)
     apk.chmod(0o444)
     names = ["VerifyFeedClasses", "VerifyDisplayFilter", "VerifyShortsFilter"]
+    if args.background_playback:
+        names.append("VerifyBackgroundPlayback")
     subprocess.run(["javac", "--release", "8", "-Xlint:-options", "-d", str(work), *[str(ROOT / (name + ".java")) for name in names]], check=True)
     subprocess.run(["java", "-cp", str(args.d8_jar), "com.android.tools.r8.D8", "--min-api", "32", "--output", str(work), *[str(work / (name + ".class")) for name in names]], check=True)
     dex = work / "classes.dex"
@@ -45,10 +48,26 @@ def main():
     required = ["PASS: ART verified and initialized " + name for name in ["alap", "alic"]]
     if args.display_filter:
         required += ["PASS: actual component filter replaces explicit ads", "PASS: ART verified and initialized vin", "PASS: actual component bridge preserves null inputs"]
-    if args.shorts_filter:
+    if args.shorts_filter or args.background_playback:
         original = work / "original.apk"
         shutil.copyfile(args.original_apk, original)
         original.chmod(0o444)
+    if args.background_playback:
+        background_command = [str(runtime), "-Djava.class.path=" + str(dex), "/system/bin", "VerifyBackgroundPlayback"]
+        before = subprocess.run([*background_command, str(original), str(work)], capture_output=True, text=True)
+        before_output = before.stdout + before.stderr
+        (work / "background-before.txt").write_text(before_output)
+        if before.returncode != 1 or "Active video is still rejected for missing server background-play eligibility" not in before_output:
+            print("FAIL: original background-play regression did not fail for the intended eligibility reason")
+            print(before_output, end="")
+            return 2
+        after = subprocess.run([*background_command, str(apk), str(work)], capture_output=True, text=True)
+        after_output = after.stdout + after.stderr
+        (work / "background-after.txt").write_text(after_output)
+        print(after_output, end="")
+        if after.returncode != 0 or "PASS: actual player controller permits background play" not in after_output:
+            return after.returncode or 2
+    if args.shorts_filter:
         shorts_command = [str(runtime), "-Djava.class.path=" + str(dex), "/system/bin", "VerifyShortsFilter"]
         before = subprocess.run([*shorts_command, str(original), str(work)], capture_output=True, text=True)
         before_output = before.stdout + before.stderr

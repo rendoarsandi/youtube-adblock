@@ -30,7 +30,7 @@ DEPENDENCIES = {
         "a9cd40df818845456be6d696de6110c89edf4b0a0580cb83438ed6b25a366e67"),
 }
 PACKAGE = "app.revanced.android.youtube"
-PATCH_VERSION = "v0.1.4"
+PATCH_VERSION = "v0.1.5"
 COMPANION_LAYOUTS = {"res/QWG.xml", "res/QgJ.xml"}
 
 
@@ -187,6 +187,7 @@ def main():
     metrics = json.loads((built / "build-metrics.json").read_text())
     result = {"package": PACKAGE, "version": "21.40.161", "patch_version": PATCH_VERSION, "apk_sha256": sha256(apk), "apk_bytes": apk.stat().st_size,
               "signed": not args.unsigned, "runtime_verified": False, "startup_dependency_check": True, "original_classes_preserved": 56152,
+              "background_playback_hook_count": 5, "live_screen_off_playback_verified": False,
               **metrics, "dex_roundtrip_validated_classes": 56152 + metrics["helper_classes_added"],
               "unchanged_native_library_and_asset_members": untouched, "changed_companion_layouts": sorted(COMPANION_LAYOUTS)}
     (output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")

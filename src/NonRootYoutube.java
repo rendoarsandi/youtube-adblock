@@ -395,7 +395,15 @@ public final class NonRootYoutube {
             updated = mutable;
             count("hook:stream:" + stream.template());
         }
-        if (!modified && hook == null && stream == null && shortsHook == null) return ImmutableMethod.of(method);
+        String backgroundHook = BackgroundPlayback.hook(id(method));
+        if (backgroundHook != null) {
+            require(!modified && hook == null && stream == null && shortsHook == null,
+                "Background target overlaps an existing hook");
+            require(SEEN_HOOKS.add(backgroundHook), "Duplicate background target");
+            updated = BackgroundPlayback.apply(method);
+            count("hook:" + backgroundHook);
+        }
+        if (!modified && hook == null && stream == null && shortsHook == null && backgroundHook == null) return ImmutableMethod.of(method);
         return new ImmutableMethod(method.getDefiningClass(), method.getName(), method.getParameters(), method.getReturnType(),
             method.getAccessFlags(), method.getAnnotations(), method.getHiddenApiRestrictions(), updated);
     }
@@ -537,6 +545,7 @@ public final class NonRootYoutube {
             module.add(new ByteInputSource(Files.readAllBytes(combinedPath), "classes9.dex"));
             System.out.println("Validated helper classes9.dex: " + classes.size() + " classes, including " + RELOCATED.size() + " relocated classes.");
             Set<String> expectedHooks = new HashSet<>(HOOKS.values());
+            expectedHooks.addAll(BackgroundPlayback.hooks());
             expectedHooks.addAll(SHORTS_HOOKS.values());
             for (StreamHook stream : STREAMS.values()) if (COMPAT_PLAYBACK || stream.template() == 9) expectedHooks.add("stream:" + stream.template());
             expectedHooks.add("stream:8");

@@ -8,6 +8,7 @@ Related upstream implementations:
 - `patches/src/main/kotlin/app/revanced/patches/youtube/ad/general`: browse/search Automotive context hook.
 - `patches/src/main/kotlin/app/revanced/patches/shared/misc/gms` and `youtube/misc/gms`: non-root service routing.
 - `patches/src/main/kotlin/app/revanced/patches/shared/misc/spoof` and `youtube/misc/spoof`: playback compatibility hooks.
+- [YouTube background playback patch](https://gitlab.com/ReVanced/revanced-patches/-/tree/main/patches/src/main/kotlin/app/revanced/patches/youtube/misc/backgroundplayback): eligibility, settings and kids-policy changes adapted in `BackgroundPlayback.java` on 2026-10-22, with exact-version guards for 21.40.161.
 - `extensions/shared/library/src/main/java/app/revanced/extension/shared/spoof` and `extensions/shared/protobuf/src/main/proto`: vendored playback sources and proto definitions.
 
 Local modifications include exact-version instruction-digest guards, changed hook locations/fields/registers for 21.40.161, fixed client defaults, initialization before the first intercepted request, standalone support shims, generic-only error logging, omitted settings/stats UI, a class-local streaming bridge, feed-context mutation, DEX class relocation to fit reference limits, package/resource changes and static validation. Original user-agent package strings are retained except for the narrowly guarded GmsCore prime check.

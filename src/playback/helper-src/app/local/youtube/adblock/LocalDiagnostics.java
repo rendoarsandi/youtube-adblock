@@ -40,13 +40,13 @@ public final class LocalDiagnostics {
                 return thread;
             });
             final long started = System.currentTimeMillis();
-            final String name = "YouTube-v0.1.4-local-" + started + ".txt";
+            final String name = "YouTube-v0.1.5-local-" + started + ".txt";
             final Object[] downloadUri = {null};
             final int[] ticks = {0};
             worker.scheduleWithFixedDelay(() -> {
                 try {
                     pingMainLooper();
-                    String report = "build=v0.1.4\n"
+                    String report = "build=v0.1.5\n"
                         + "elapsed_ms=" + (System.currentTimeMillis() - started) + "\n"
                         + "display_ads_replaced=" + HIDDEN.get() + "\n"
                         + "shorts_entries_filtered=" + SHORTS_FILTERED.get() + "\n"
