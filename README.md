@@ -4,14 +4,14 @@ Experimental ad-blocking patch and non-root build tools for the exact **YouTube 
 
 This repository contains patch/build code and optional playback helper sources. Building still requires the original APK files. The released APK retains Google's compiled app and assets. This is an unofficial modified application.
 
-**v0.1.5 adds the missing background-playback gates and native setting while retaining the ad filters.** Android regression checks pass; live screen-off playback remains unverified. This YouTube version is outside the checked upstream compatibility list.
+**v0.1.7 fixes mid-video playback by enabling the maintained stream repair by default.** The user confirmed playback works on the matching installed APK. Android checks also cover fresh defaults, explicit user settings, error capture, ad filters, Shorts and background eligibility. Other devices and all content types are not established by this confirmation.
 
 ## Download and install
 
-Download `YouTube-Adblock-v0.1.5.apk` from the [experimental prerelease](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.5). APKs are Release attachments, not Git files. The release includes its SHA-256 checksum; update details are in the release description. The APK is about 117 MB. `21.40.161` is the original YouTube version; `v0.1.5` is this project's patch revision. Install over the previous mod to retain app data; the signing key is unchanged.
+Download `YouTube-Adblock-v0.1.7.apk` from the [release](https://github.com/rendoarsandi/youtube-adblock/releases/tag/v0.1.7). APKs are Release attachments, with checksums and validation metadata. The app label is **YouTube Adblock**, based on YouTube 21.40.161. It updates over v0.1.6 without uninstalling. v0.1.5 and older used a different signing key and require a one-time reinstall of the modified app.
 
 1. Install the standard non-Huawei APK from the [official ReVanced GmsCore release](https://github.com/ReVanced/GmsCore/releases/tag/v0.3.13.2.250932), if not already installed for the Music test. **Open its microG screen once before launching this app.** Allow it to run in the background; sign-in is handled separately.
-2. Install this project's APK and open **YouTube (Ad test)**.
+2. Install this project's APK and open **YouTube Adblock**.
 3. Sign in yourself through GmsCore if needed; its screen may say **microG**.
 4. Test opening a video, several minutes of playback, seeking, a second video, and whether playback/feed ads appear. Report the exact error and device/Android version if it fails.
 
@@ -27,7 +27,7 @@ The test package is `app.revanced.android.youtube`, so it can coexist with offic
 | Companion ad cards | Collapses the dedicated legacy and Elements ad-container stubs, preserving the mixed parent layout and ad callbacks. |
 | Sponsored Shorts | Uses native video/image ad classification before dynamic insertion, feed-list assembly and seed construction. Commands and their tracking entries remain paired. |
 | Background playback | Enables video/Shorts eligibility, the native background setting and Shorts feature gate, and removes the kids background policy restriction. Exact-version instruction digests guard all five targets. |
-| Playback recovery | Restores the eight original playback owner classes, including request routing, stream data, POST bodies and feature decisions; excludes the older stream-fetch helpers from the default APK. |
+| Playback repair | Uses the maintained anddea/Morphe stream patch with guarded adaptations for 21.40.161. Corrects GmsCore support status so stream repair is enabled by default; preserves explicit user disablement. |
 | Non-root sign-in | Redirects selected service constants and metadata to ReVanced GmsCore. |
 | Package/resources | Renames the install package and provider authorities, merges five APKs and repairs sparse resource type specifications. |
 
@@ -43,11 +43,22 @@ Crashes, failed login, playback interruptions and incomplete ad blocking are pos
 
 [YouTube's terms](https://www.youtube.com/static?template=terms) restrict modification and reverse engineering, subject to stated exceptions. Compliance, undetectability and freedom from account restrictions are not guaranteed. Google can restrict a service or [disable an entire Google Account](https://support.google.com/accounts/answer/40695?hl=en). A separate account does not guarantee isolation from consequences for other accounts. [YouTube's termination policy](https://support.google.com/youtube/answer/2802168?hl=en) also prohibits circumventing channel termination with another channel.
 
-The default recovery build uses YouTube's original network/playback implementation. The optional `compat` build includes the older upstream stream-fetch helper and uses relevant headers supplied by the app; that mode is unreliable and is not the released recovery APK. No account credentials are included in the repository. Do not post passwords, tokens or account data in issues.
+The legacy `build.py` recovery build uses YouTube's original network/playback implementation. The optional `compat` build includes the older upstream stream-fetch helper and uses relevant headers supplied by the app; that mode is unreliable and is not the released recovery APK. No account credentials are included in the repository. Do not post passwords, tokens or account data in issues.
 
-The app writes a small local report after about 15 seconds in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.5-local-*.txt`. It records successful display replacements, removed Shorts entries, display-filter errors, main-looper delay and this app's recent exit reason codes/timestamps. The Shorts count is entries removed across filtering boundaries, not a count of unique advertisements. File work runs in the background and stops after 20 snapshots, roughly five minutes. It records no account/provider values, headers, URLs or video IDs and sends no report. Network outcomes are not collected, so this report cannot identify a streaming-server rejection. A pending looper ping alone does not establish a stall. Sessions shorter than 15 seconds may produce no report.
+The legacy ad counter still writes a small local report after about 15 seconds in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.5-local-*.txt`. It records successful display replacements, removed Shorts entries, display-filter errors, main-looper delay and this app's recent exit reason codes/timestamps. The Shorts count is entries removed across filtering boundaries, not a count of unique advertisements. File work runs in the background and stops after 20 snapshots, roughly five minutes. It records no account/provider values, headers, URLs or video IDs and sends no report. Network outcomes are not collected, so this report cannot identify a streaming-server rejection. A pending looper ping alone does not establish a stall. Sessions shorter than 15 seconds may produce no report.
 
-## Build from source
+## Build v0.1.7 from source
+
+Use the exact v0.1.6 release APK and retain its signing key for an in-place update:
+
+```bash
+python build_playback_update.py --input-apk /private/YouTube-Adblock-v0.1.6.apk \
+  --output-dir /private/new-build --d8-jar /path/to/d8.jar
+```
+
+`build_stream_repair.py` builds the v0.1.6 intermediate from this project's exact v0.1.5 APK. `tools/stream_compat/` retains the guarded adaptation sources. New playback/crash reports are bounded and device-local in `Downloads/YouTube-Adblock-Diagnostics/YouTube-v0.1.7-playback-*.txt`; they include numeric outcomes and exception stacks, excluding URLs, headers, bodies and media/account identifiers.
+
+## Legacy source build
 
 Requirements: Python 3.11+, JDK 21, a D8 compiler JAR, `aapt`, `zipalign` supporting `-P 16`, and `apksigner`/`keytool` for signing. Android/Termux is the checked host; other hosts are unverified. The optional older `--playback-mode compat` also requires `protoc` 35.1.
 
@@ -69,7 +80,7 @@ python build.py --input-dir /private/path/to/apks --d8-jar /path/to/d8.jar
 
 On Termux, D8 is normally at `$PREFIX/share/java/d8.jar`. The build downloads pinned ReVanced CLI and APKEditor artifacts and verifies SHA-256 before use. Native playback is the default. Compatibility mode additionally downloads protobuf, regenerates/compiles the older helpers, excludes Android/JSON compilation stubs and shades protobuf to avoid collisions with Google's classes. Source, dependency and build provenance are documented in [the notices](THIRD_PARTY_NOTICES.md).
 
-Outputs and a generated private signing key stay under ignored `.local-build/`. Keep that key private and retain it for compatible future updates. Add `--unsigned` to omit signing, or reuse a private key:
+Outputs stay under ignored `.local-build/`; the private signing key is retained separately in `~/.local/share/youtube-adblock/signing/`. Keep that key private and retain it for compatible future updates. Add `--unsigned` to omit signing, or reuse a private key:
 
 ```bash
 python build.py --input-dir /private/path/to/apks --d8-jar /path/to/d8.jar \

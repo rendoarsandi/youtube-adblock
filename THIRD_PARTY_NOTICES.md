@@ -1,5 +1,11 @@
 # Attribution and third-party notices
 
+The v0.1.7 local update corrects the shared `GmsCoreSupport` status for this project's existing non-root integration, allowing the maintained streaming patch's default to activate. It adds locally authored, bounded diagnostic capture for numeric playback outcomes and exception types/stacks; it does not collect request URLs, headers, bodies or account/video identifiers.
+
+The local `build_stream_repair.py` route uses [anddea's v4.4.0-dev.3 patch bundle](https://github.com/anddea/revanced-patches/releases/tag/v4.4.0-dev.3) and [Morphe Desktop 1.19.1](https://github.com/MorpheApp/morphe-desktop/releases/tag/v1.19.1). They include work by anddea, inotia00, Morphe and ReVanced under GPLv3 and their preserved additional attribution terms. The resulting application retains upstream settings and visible credits.
+
+Local modifications for YouTube 21.40.161: an exact guarded player-state fingerprint fallback and null-argument guard, and a content-provider diagnostic location that accepts either ordering while preserving the map-insertion match. `tools/stream_compat/` contains the adaptation sources and original artifact/class/method digests. The upstream patch bundle is modified locally by this project; this build is not an upstream release. All unrelated bundle entries are compared byte for byte. Packaging restores the mod's package name, changes its plain label and update code, and preserves original sparse resource flags alongside added entries.
+
 This project adapts public [ReVanced patch sources](https://gitlab.com/ReVanced/revanced-patches/-/tree/015fe10a23ea5b919a3fda6e7da2c176517ae75d), GPL-3.0. Vendored playback Java/proto sources are identified by original path, commit and source digest in [provenance.json](src/playback/provenance.json). The upstream license is retained in [licenses/UPSTREAM-LICENSE](licenses/UPSTREAM-LICENSE).
 
 Related upstream implementations:

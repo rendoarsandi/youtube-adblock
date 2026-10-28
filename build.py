@@ -109,8 +109,15 @@ def signing_key(args, output):
         return key, password, args.key_alias
     if args.password_file:
         raise ValueError("--password-file requires --keystore")
-    key = output / "local-signing.p12"
-    password = output / "signing-password.txt"
+    signing = Path.home() / ".local/share/youtube-adblock/signing"
+    signing.mkdir(parents=True, exist_ok=True)
+    signing.chmod(0o700)
+    key = signing / "local-signing.p12"
+    password = signing / "signing-password.txt"
+    if key.exists() or password.exists():
+        if not key.is_file() or not password.is_file():
+            raise ValueError("Incomplete persistent signing material; refusing to replace the update key")
+        return key, password, "local-experiment"
     descriptor = os.open(password, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as stream:
         stream.write(secrets.token_hex(24) + "\n")
