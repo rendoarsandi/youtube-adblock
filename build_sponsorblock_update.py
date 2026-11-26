@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build v0.1.10 (SponsorBlock skip + seekbar segments + disable diagnostics) on top of v0.1.9."""
+"""Build v0.1.12 (SponsorBlock Premium-style Skip button bounds/multi-player/manual-skip fix) on top of v0.1.9."""
 from __future__ import annotations
 
 import argparse
@@ -26,9 +26,9 @@ APKEDITOR_JAR = TOOLS_DIR / "APKEditor-1.4.9.jar"
 CLASSPATH = f"{REVANCED_JAR}:{APKEDITOR_JAR}"
 DEFAULT_INPUT_APK = LOCAL_BUILD / "youtube-noshorts-v019-final/YouTube-Adblock-v0.1.9.apk"
 INPUT_SHA = "12730ca6cd102268a395a173cc73609005c857f085111423d8ef40f84fd4ef93"
-OUTPUT_DIR = LOCAL_BUILD / "youtube-sponsorblock-v0110-final"
-OUTPUT_APK = OUTPUT_DIR / "YouTube-Adblock-v0.1.10.apk"
-DOWNLOAD_APK = Path("/sdcard/Download/YouTube-Adblock-v0.1.10.apk")
+OUTPUT_DIR = LOCAL_BUILD / "youtube-sponsorblock-v0112-final"
+OUTPUT_APK = OUTPUT_DIR / "YouTube-Adblock-v0.1.12.apk"
+DOWNLOAD_APK = Path("/sdcard/Download/YouTube-Adblock-v0.1.12.apk")
 
 
 COMPILE_STUBS: dict[str, str] = {
@@ -80,6 +80,14 @@ public class Rect {
     public int top;
     public int right;
     public int bottom;
+    public Rect() {}
+    public Rect(Rect r) {
+        if (r != null) { left = r.left; top = r.top; right = r.right; bottom = r.bottom; }
+    }
+    public boolean isEmpty() { return left >= right || top >= bottom; }
+    public int width() { return right - left; }
+    public int height() { return bottom - top; }
+    public void offset(int dx, int dy) { left += dx; right += dx; top += dy; bottom += dy; }
 }
 """,
     "android/graphics/Typeface.java": """
@@ -108,6 +116,12 @@ public class Gravity {
     public static final int CENTER = 17;
 }
 """,
+    "android/view/ViewParent.java": """
+package android.view;
+public interface ViewParent {
+    ViewParent getParent();
+}
+""",
     "android/view/View.java": """
 package android.view;
 import android.content.Context;
@@ -117,6 +131,10 @@ import android.util.AttributeSet;
 public class View {
     public static final int VISIBLE = 0;
     public static final int GONE = 8;
+    public static class MeasureSpec {
+        public static final int EXACTLY = 1073741824;
+        public static int makeMeasureSpec(int size, int mode) { return 0; }
+    }
     public interface OnClickListener {
         void onClick(View v);
     }
@@ -125,6 +143,7 @@ public class View {
     public View(Context c, AttributeSet a, int d) {}
     public View(Context c, AttributeSet a, int d, int r) {}
     public Context getContext() { return null; }
+    public ViewParent getParent() { return null; }
     public void setVisibility(int visibility) {}
     public int getVisibility() { return 0; }
     public void setClickable(boolean clickable) {}
@@ -133,11 +152,22 @@ public class View {
     public void setMinimumHeight(int minHeight) {}
     public void setBackground(Drawable bg) {}
     public void setElevation(float elevation) {}
+    public void setTranslationX(float x) {}
+    public void setTranslationY(float y) {}
     public void setTranslationZ(float z) {}
     public void setLayoutParams(ViewGroup.LayoutParams params) {}
     public ViewGroup.LayoutParams getLayoutParams() { return null; }
     public void setOnClickListener(OnClickListener l) {}
     public void bringToFront() {}
+    public final int getLeft() { return 0; }
+    public final int getTop() { return 0; }
+    public final void measure(int widthMeasureSpec, int heightMeasureSpec) {}
+    public void layout(int l, int t, int r, int b) {}
+    public final int getMeasuredWidth() { return 0; }
+    public final int getMeasuredHeight() { return 0; }
+    public boolean isLayoutRequested() { return false; }
+    public void requestLayout() {}
+    public void invalidate() {}
     protected void dispatchDraw(Canvas canvas) {}
 }
 """,
@@ -145,7 +175,7 @@ public class View {
 package android.view;
 import android.content.Context;
 import android.util.AttributeSet;
-public abstract class ViewGroup extends View {
+public abstract class ViewGroup extends View implements ViewParent {
     public static class LayoutParams {
         public static final int MATCH_PARENT = -1;
         public static final int WRAP_CONTENT = -2;
@@ -168,6 +198,8 @@ public abstract class ViewGroup extends View {
     public ViewGroup(Context c, AttributeSet a, int d, int r) { super(c, a, d, r); }
     public void addView(View child) {}
     public void addView(View child, LayoutParams params) {}
+    public int getChildCount() { return 0; }
+    public int indexOfChild(View child) { return -1; }
     public void setClipChildren(boolean clip) {}
     public void setClipToPadding(boolean clip) {}
     public void setOnHierarchyChangeListener(OnHierarchyChangeListener listener) {}
@@ -446,7 +478,7 @@ public final class UpdateApkV0110 {
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[2])), "classes2.dex"));
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[3])), "classes9.dex"));
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[4])), "classes11.dex"));
-            manifest.setVersionCode(1561301418);
+            manifest.setVersionCode(1561301420);
             module.setApkSignatureBlock(null);
             module.removeInputSource("stamp-cert-sha256");
             for (var source : module.listInputSources()) {
@@ -541,7 +573,7 @@ public final class UpdateApkV0110 {
         run(["zipalign", "-c", "-P", "16", "4", str(OUTPUT_APK)])
         badging = run(["aapt", "dump", "badging", str(OUTPUT_APK)])
         (OUTPUT_DIR / "badging.txt").write_text(badging, encoding="utf-8")
-        if "name='app.revanced.android.youtube'" not in badging or "versionCode='1561301418'" not in badging:
+        if "name='app.revanced.android.youtube'" not in badging or "versionCode='1561301420'" not in badging:
             raise RuntimeError("Unexpected update identity")
 
         with zipfile.ZipFile(base_apk) as before, zipfile.ZipFile(OUTPUT_APK) as after:
@@ -555,15 +587,17 @@ public final class UpdateApkV0110 {
         metadata = {
             "package": build.PACKAGE,
             "version": "21.40.161",
-            "patch_version": "v0.1.10",
-            "version_code": 1561301418,
+            "patch_version": "v0.1.12",
+            "version_code": 1561301420,
             "apk_sha256": out_sha,
             "apk_bytes": OUTPUT_APK.stat().st_size,
             "same_signer_as_v019": True,
             "changes": [
                 "Disabled LocalDiagnostics and PlaybackDiagnostics (no background threads or Download/YouTube-Adblock-Diagnostics files)",
-                "Wired VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to Morphe SponsorBlock via SponsorBlockBridge",
-                "Attached programmatic SkipSponsorButton overlay to YouTubePlayerOverlaysLayout.onFinishInflate for manual-skip pills and auto-skip undo toast",
+                "Wired VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to Morphe SponsorBlock via SponsorBlockBridge (with videoLength > 0 guard)",
+                "Hooked YouTubePlayerOverlaysLayout.u(Optional<Lqyn>) so the main watch player (Loif.t) owns SponsorBlockViewController's Skip pill overlay and secondary inline feed players (Loif.d) cannot hijack it",
+                "Positioned and measured the SponsorBlock overlay using the live video player bounds qyn.b().C() (matching YouTube's Lqol overlays) and forced re-measure when SkipSponsorButton transitions GONE -> VISIBLE",
+                "Changed SB_CATEGORY_SPONSOR default to manual-skip and disabled SB_AUTO_HIDE_SKIP_BUTTON so sponsors and other segments show a persistent clickable Premium-style Skip pill",
                 "Rendered colored SponsorBlock segment bars on the seekbar in Ljsi.onDraw before the scrubber thumb",
                 "Disabled SB_TOAST_ON_CONNECTION_ERROR by default to keep network hiccups silent",
             ],

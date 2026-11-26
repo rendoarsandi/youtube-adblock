@@ -75,6 +75,7 @@ public final class SponsorBlockBridge {
 
     public static void onVideoTime(final long videoTime) {
         try {
+            if (VideoInformation.getVideoLength() <= 0L) return;
             if (Utils.isCurrentlyOnMainThread()) {
                 SegmentPlaybackController.setVideoTime(videoTime);
             } else {
@@ -82,6 +83,7 @@ public final class SponsorBlockBridge {
                     @Override
                     public void run() {
                         try {
+                            if (VideoInformation.getVideoLength() <= 0L) return;
                             SegmentPlaybackController.setVideoTime(videoTime);
                         } catch (Throwable ignored) { }
                     }

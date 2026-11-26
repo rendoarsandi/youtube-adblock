@@ -7,9 +7,12 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import app.local.youtube.adblock.SponsorBlockOverlayHelper;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.sponsorblock.SegmentPlaybackController;
 import app.morphe.extension.youtube.sponsorblock.objects.SponsorSegment;
@@ -47,8 +50,8 @@ public class SkipSponsorButton extends FrameLayout {
 
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setColor(0xD90F0F0F);
-        bg.setStroke(Math.max(1, dp(1)), 0x66FFFFFF);
+        bg.setColor(0xE60F0F0F);
+        bg.setStroke(Math.max(1, dp(1)), 0x80FFFFFF);
         bg.setCornerRadius(dp(20));
         this.pillBackground = bg;
 
@@ -58,8 +61,8 @@ public class SkipSponsorButton extends FrameLayout {
         container.setMinimumHeight(dp(40));
         container.setPadding(dp(16), dp(8), dp(16), dp(8));
         container.setBackground(bg);
-        container.setClickable(true);
-        container.setFocusable(true);
+        container.setClickable(false);
+        container.setFocusable(false);
 
         TextView label = new TextView(context);
         label.setTextColor(0xFFFFFFFF);
@@ -82,7 +85,7 @@ public class SkipSponsorButton extends FrameLayout {
 
         updateLayout();
 
-        container.setOnClickListener(new View.OnClickListener() {
+        setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 setVisibility(View.GONE);
@@ -96,6 +99,16 @@ public class SkipSponsorButton extends FrameLayout {
 
     private int dp(int value) {
         return Math.round(value * density);
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(visibility);
+        if (visibility == View.VISIBLE) {
+            SponsorBlockOverlayHelper.onButtonShown(this);
+            requestLayout();
+            invalidate();
+        }
     }
 
     @Override
@@ -118,7 +131,7 @@ public class SkipSponsorButton extends FrameLayout {
         this.segment = sponsorSegment;
         if (sponsorSegment == null) return;
         String text = sponsorSegment.getSkipButtonText();
-        if (text == null || text.isEmpty()) {
+        if (text == null || text.isEmpty() || text.startsWith("revanced_sb_")) {
             text = "Skip";
         }
         String display = text + " \u00BB";

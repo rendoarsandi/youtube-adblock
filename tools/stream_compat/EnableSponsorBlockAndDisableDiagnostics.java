@@ -3,7 +3,9 @@ import com.android.tools.smali.dexlib2.Opcode;
 import com.android.tools.smali.dexlib2.Opcodes;
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation;
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction10x;
+import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction21c;
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction22c;
+import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction22x;
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c;
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc;
 import com.android.tools.smali.dexlib2.iface.ClassDef;
@@ -20,6 +22,7 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference;
 import com.android.tools.smali.dexlib2.immutable.ImmutableClassDef;
 import com.android.tools.smali.dexlib2.immutable.ImmutableDexFile;
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod;
+import com.android.tools.smali.dexlib2.immutable.reference.ImmutableFieldReference;
 import com.android.tools.smali.dexlib2.immutable.reference.ImmutableMethodReference;
 import java.io.File;
 import java.util.ArrayList;
@@ -28,10 +31,17 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Applies v0.1.10 SponsorBlock + disable-diagnostics patches on top of v0.1.9:
+ * Applies v0.1.12 SponsorBlock + disable-diagnostics patches on top of v0.1.9:
  * 1. classes2.dex:
  *    - YouTubePlayerOverlaysLayout;->onFinishInflate()V:
  *      calls SponsorBlockViewController.initialize(this) to attach the floating Skip pill overlay.
+ *    - YouTubePlayerOverlaysLayout;->u(...21 params...)V:
+ *      passes (this, p20=Optional<Lqyn>) to SponsorBlockOverlayHelper.onOverlaysConfigured so the
+ *      main watch player (Loif.t) owns the active overlay and exposes live video bounds qyn.b().C(),
+ *      while secondary inline players (Loif.d) cannot hijack SponsorBlockViewController refs.
+ *    - YouTubePlayerOverlaysLayout;->onMeasure(II)V & onLayout(ZIIII)V:
+ *      calls SponsorBlockOverlayHelper.{onOverlaysMeasure,onOverlaysLayout} in the C && G modern
+ *      overlay layout branch so the Skip pill overlay matches Lqol's exact video player rect.
  *    - Ljsi;->onDraw(Landroid/graphics/Canvas;)V:
  *      draws SponsorBlock colored segment bars right before the seekbar scrubber thumb.
  * 2. classes9.dex:
@@ -39,7 +49,9 @@ import java.util.List;
  *    - Replaces SkipSponsorButton with programmatic view (removes old synthetic lambda).
  *    - Routes SponsorBlockViewController.initialize(ViewGroup) to SponsorBlockOverlayHelper.initialize(ViewGroup).
  *    - Wires VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to SponsorBlockBridge.
- *    - Flips Settings.SB_TOAST_ON_CONNECTION_ERROR default to Boolean.FALSE.
+ *    - Sets Settings.SB_CATEGORY_SPONSOR default to CategoryBehaviour.MANUAL_SKIP ("manual-skip") so
+ *      sponsors show the clickable Premium-style Skip pill, and flips SB_AUTO_HIDE_SKIP_BUTTON &
+ *      SB_TOAST_ON_CONNECTION_ERROR defaults to Boolean.FALSE.
  * 3. classes11.dex:
  *    - Replaces PlaybackDiagnostics with no-op (removes PlaybackDiagnostics$* inner classes).
  *    - Adds SponsorBlockBridge (+ inner classes) and SponsorBlockOverlayHelper (+ inner classes).
@@ -94,13 +106,16 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
         patchClasses2(new File(args[0]), new File(args[1]));
         patchClasses9(new File(args[2]), new File(args[3]), newLocalDiag, skipBtnClasses);
         patchClasses11(new File(args[4]), new File(args[5]), newPlaybackDiag, bridgeAndOverlayClasses);
-        System.out.println("EnableSponsorBlockAndDisableDiagnostics applied all v0.1.10 DEX patches.");
+        System.out.println("EnableSponsorBlockAndDisableDiagnostics applied all v0.1.12 DEX patches.");
     }
 
     private static void patchClasses2(File inDex, File outDex) throws Exception {
         DexFile dex = DexFileFactory.loadDexFile(inDex, Opcodes.getDefault());
         List<ClassDef> updated = new ArrayList<>();
-        boolean patchedOverlays = false;
+        boolean patchedOverlaysInflate = false;
+        boolean patchedOverlaysConfigure = false;
+        boolean patchedOverlaysMeasure = false;
+        boolean patchedOverlaysLayout = false;
         boolean patchedTimeBar = false;
 
         for (ClassDef c : dex.getClasses()) {
@@ -113,7 +128,29 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                         && m.getParameterTypes().isEmpty()
                         && m.getReturnType().equals("V")) {
                         virtual.add(patchOverlaysOnFinishInflate(m));
-                        patchedOverlays = true;
+                        patchedOverlaysInflate = true;
+                    } else if (m.getName().equals("u")
+                        && m.getParameterTypes().size() == 21
+                        && m.getReturnType().equals("V")) {
+                        virtual.add(patchOverlaysConfigure(m));
+                        patchedOverlaysConfigure = true;
+                    } else if (m.getName().equals("onMeasure")
+                        && m.getParameterTypes().size() == 2
+                        && m.getParameterTypes().get(0).toString().equals("I")
+                        && m.getParameterTypes().get(1).toString().equals("I")
+                        && m.getReturnType().equals("V")) {
+                        virtual.add(patchOverlaysOnMeasure(m));
+                        patchedOverlaysMeasure = true;
+                    } else if (m.getName().equals("onLayout")
+                        && m.getParameterTypes().size() == 5
+                        && m.getParameterTypes().get(0).toString().equals("Z")
+                        && m.getParameterTypes().get(1).toString().equals("I")
+                        && m.getParameterTypes().get(2).toString().equals("I")
+                        && m.getParameterTypes().get(3).toString().equals("I")
+                        && m.getParameterTypes().get(4).toString().equals("I")
+                        && m.getReturnType().equals("V")) {
+                        virtual.add(patchOverlaysOnLayout(m));
+                        patchedOverlaysLayout = true;
                     } else {
                         virtual.add(m);
                     }
@@ -139,7 +176,10 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                 updated.add(c);
             }
         }
-        if (!patchedOverlays) throw new IllegalStateException("Did not find YouTubePlayerOverlaysLayout.onFinishInflate in classes2.dex");
+        if (!patchedOverlaysInflate) throw new IllegalStateException("Did not find YouTubePlayerOverlaysLayout.onFinishInflate in classes2.dex");
+        if (!patchedOverlaysConfigure) throw new IllegalStateException("Did not find YouTubePlayerOverlaysLayout.u(21 params) in classes2.dex");
+        if (!patchedOverlaysMeasure) throw new IllegalStateException("Did not find YouTubePlayerOverlaysLayout.onMeasure in classes2.dex");
+        if (!patchedOverlaysLayout) throw new IllegalStateException("Did not find YouTubePlayerOverlaysLayout.onLayout in classes2.dex");
         if (!patchedTimeBar) throw new IllegalStateException("Did not find Ljsi.onDraw(Canvas) in classes2.dex");
         DexFileFactory.writeDexFile(outDex.getAbsolutePath(), new ImmutableDexFile(dex.getOpcodes(), updated));
     }
@@ -170,6 +210,167 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                     SB_VIEW_CTRL_TYPE,
                     "initialize",
                     Collections.singletonList("Landroid/view/ViewGroup;"),
+                    "V"
+                )
+            )
+        );
+        return cloneMethod(m, mutable);
+    }
+
+    private static Method patchOverlaysConfigure(Method m) {
+        MethodImplementation impl = m.getImplementation();
+        if (impl == null || impl.getRegisterCount() != 23) {
+            throw new IllegalStateException("Unexpected YouTubePlayerOverlaysLayout.u register count");
+        }
+        MutableMethodImplementation mutable = new MutableMethodImplementation(impl);
+        List<? extends Instruction> insns = mutable.getInstructions();
+        int insertIdx = -1;
+        int matches = 0;
+        for (int i = 0; i < insns.size() - 2; i++) {
+            Instruction a = insns.get(i);
+            Instruction b = insns.get(i + 1);
+            Instruction c = insns.get(i + 2);
+            if (a.getOpcode() == Opcode.INVOKE_VIRTUAL_RANGE
+                && a instanceof ReferenceInstruction
+                && "Lj$/util/Optional;->isPresent()Z".equals(((ReferenceInstruction) a).getReference().toString())
+                && b.getOpcode() == Opcode.MOVE_RESULT
+                && c.getOpcode() == Opcode.IPUT_BOOLEAN
+                && c instanceof TwoRegisterInstruction
+                && c instanceof ReferenceInstruction
+                && ((TwoRegisterInstruction) c).getRegisterA() == 2
+                && ((TwoRegisterInstruction) c).getRegisterB() == 1
+                && (OVERLAYS_LAYOUT_TYPE + "->G:Z").equals(((ReferenceInstruction) c).getReference().toString())) {
+                insertIdx = i + 3;
+                matches++;
+            }
+        }
+        if (matches != 1 || insertIdx < 0) {
+            throw new IllegalStateException("Expected unique Optional<Lqyn> -> G anchor in YouTubePlayerOverlaysLayout.u, found " + matches);
+        }
+        // Right after `iput-boolean v2, v1 ->G:Z`, v2 is immediately overwritten by `iget-object v2, v1 ->z`,
+        // while v1 holds `this` (ViewGroup) and v21 holds p20 (Optional<Lqyn>).
+        mutable.addInstruction(
+            insertIdx,
+            new BuilderInstruction22x(Opcode.MOVE_OBJECT_FROM16, 2, 21)
+        );
+        mutable.addInstruction(
+            insertIdx + 1,
+            new BuilderInstruction35c(
+                Opcode.INVOKE_STATIC,
+                2,
+                1, // v1 = this (ViewGroup)
+                2, // v2 = Optional<Lqyn>
+                0, 0, 0,
+                new ImmutableMethodReference(
+                    SB_OVERLAY_HELPER_TYPE,
+                    "onOverlaysConfigured",
+                    Arrays.asList("Landroid/view/ViewGroup;", "Ljava/lang/Object;"),
+                    "V"
+                )
+            )
+        );
+        return cloneMethod(m, mutable);
+    }
+
+    private static Method patchOverlaysOnMeasure(Method m) {
+        MethodImplementation impl = m.getImplementation();
+        if (impl == null || impl.getRegisterCount() != 4) {
+            throw new IllegalStateException("Unexpected YouTubePlayerOverlaysLayout.onMeasure register count");
+        }
+        MutableMethodImplementation mutable = new MutableMethodImplementation(impl);
+        List<? extends Instruction> insns = mutable.getInstructions();
+        int insertIdx = -1;
+        int matches = 0;
+        for (int i = 0; i < insns.size() - 1; i++) {
+            Instruction a = insns.get(i);
+            Instruction b = insns.get(i + 1);
+            if (a.getOpcode() == Opcode.INVOKE_VIRTUAL
+                && a instanceof FiveRegisterInstruction
+                && a instanceof ReferenceInstruction
+                && (OVERLAYS_LAYOUT_TYPE + "->setMeasuredDimension(II)V")
+                    .equals(((ReferenceInstruction) a).getReference().toString())
+                && ((FiveRegisterInstruction) a).getRegisterC() == 1
+                && ((FiveRegisterInstruction) a).getRegisterD() == 2
+                && ((FiveRegisterInstruction) a).getRegisterE() == 3
+                && b.getOpcode() == Opcode.IGET_OBJECT
+                && b instanceof TwoRegisterInstruction
+                && b instanceof ReferenceInstruction
+                && (OVERLAYS_LAYOUT_TYPE + "->k:Ljava/util/Set;")
+                    .equals(((ReferenceInstruction) b).getReference().toString())) {
+                insertIdx = i + 1;
+                matches++;
+            }
+        }
+        if (matches != 1 || insertIdx < 0) {
+            throw new IllegalStateException("Expected unique C&&G anchor in YouTubePlayerOverlaysLayout.onMeasure, found " + matches);
+        }
+        // Before v1 (this) is overwritten by ->k, pass (this, measuredWidth, measuredHeight) to SponsorBlockOverlayHelper.
+        mutable.addInstruction(
+            insertIdx,
+            new BuilderInstruction35c(
+                Opcode.INVOKE_STATIC,
+                3,
+                1, // v1 = this (ViewGroup)
+                2, // v2 = width
+                3, // v3 = height
+                0, 0,
+                new ImmutableMethodReference(
+                    SB_OVERLAY_HELPER_TYPE,
+                    "onOverlaysMeasure",
+                    Arrays.asList("Landroid/view/ViewGroup;", "I", "I"),
+                    "V"
+                )
+            )
+        );
+        return cloneMethod(m, mutable);
+    }
+
+    private static Method patchOverlaysOnLayout(Method m) {
+        MethodImplementation impl = m.getImplementation();
+        if (impl == null || impl.getRegisterCount() != 12) {
+            throw new IllegalStateException("Unexpected YouTubePlayerOverlaysLayout.onLayout register count");
+        }
+        MutableMethodImplementation mutable = new MutableMethodImplementation(impl);
+        List<? extends Instruction> insns = mutable.getInstructions();
+        int insertIdx = -1;
+        int matches = 0;
+        for (int i = 0; i < insns.size() - 2; i++) {
+            Instruction a = insns.get(i);
+            Instruction b = insns.get(i + 1);
+            Instruction c = insns.get(i + 2);
+            if (a.getOpcode() == Opcode.IGET_BOOLEAN
+                && a instanceof ReferenceInstruction
+                && (OVERLAYS_LAYOUT_TYPE + "->G:Z").equals(((ReferenceInstruction) a).getReference().toString())
+                && b.getOpcode() == Opcode.IF_EQZ
+                && c.getOpcode() == Opcode.IGET_OBJECT
+                && c instanceof TwoRegisterInstruction
+                && c instanceof ReferenceInstruction
+                && ((TwoRegisterInstruction) c).getRegisterA() == 6
+                && ((TwoRegisterInstruction) c).getRegisterB() == 6
+                && (OVERLAYS_LAYOUT_TYPE + "->k:Ljava/util/Set;")
+                    .equals(((ReferenceInstruction) c).getReference().toString())) {
+                insertIdx = i + 2;
+                matches++;
+            }
+        }
+        if (matches != 1 || insertIdx < 0) {
+            throw new IllegalStateException("Expected unique C&&G anchor in YouTubePlayerOverlaysLayout.onLayout, found " + matches);
+        }
+        // Before v6 (this) is overwritten by ->k, pass (this, l, t, r, b) to SponsorBlockOverlayHelper.
+        mutable.addInstruction(
+            insertIdx,
+            new BuilderInstruction35c(
+                Opcode.INVOKE_STATIC,
+                5,
+                6,  // v6 = this (ViewGroup)
+                8,  // v8 = left
+                9,  // v9 = top
+                10, // v10 = right
+                11, // v11 = bottom
+                new ImmutableMethodReference(
+                    SB_OVERLAY_HELPER_TYPE,
+                    "onOverlaysLayout",
+                    Arrays.asList("Landroid/view/ViewGroup;", "I", "I", "I", "I"),
                     "V"
                 )
             )
@@ -511,7 +712,9 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
         if (impl == null) throw new IllegalStateException("Settings.<clinit> has no body");
         MutableMethodImplementation mutable = new MutableMethodImplementation(impl);
         List<? extends Instruction> insns = mutable.getInstructions();
+        boolean flippedAutoHideSkipBtn = false;
         boolean flippedConnErrorToast = false;
+        boolean flippedSponsorManualSkip = false;
 
         for (int i = 0; i < insns.size() - 3; i++) {
             Instruction cur = insns.get(i);
@@ -522,7 +725,37 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
             Reference ref = ((ReferenceInstruction) cur).getReference();
             if (!(ref instanceof StringReference)) continue;
             String key = ((StringReference) ref).getString();
-            if (!"sb_toast_on_connection_error".equals(key)) continue;
+
+            if ("sb_sponsor".equals(key)) {
+                for (int j = i - 1; j >= Math.max(0, i - 6); j--) {
+                    Instruction prev = insns.get(j);
+                    if (prev.getOpcode() == Opcode.SGET_OBJECT
+                        && prev instanceof OneRegisterInstruction
+                        && prev instanceof ReferenceInstruction
+                        && "Lapp/morphe/extension/youtube/sponsorblock/objects/CategoryBehaviour;->SKIP_AUTOMATICALLY_ONCE:Lapp/morphe/extension/youtube/sponsorblock/objects/CategoryBehaviour;"
+                            .equals(((ReferenceInstruction) prev).getReference().toString())) {
+                        mutable.replaceInstruction(
+                            j,
+                            new BuilderInstruction21c(
+                                Opcode.SGET_OBJECT,
+                                ((OneRegisterInstruction) prev).getRegisterA(),
+                                new ImmutableFieldReference(
+                                    "Lapp/morphe/extension/youtube/sponsorblock/objects/CategoryBehaviour;",
+                                    "MANUAL_SKIP",
+                                    "Lapp/morphe/extension/youtube/sponsorblock/objects/CategoryBehaviour;"
+                                )
+                            )
+                        );
+                        flippedSponsorManualSkip = true;
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            boolean isAutoHide = "sb_auto_hide_skip_button".equals(key);
+            boolean isConnErr = "sb_toast_on_connection_error".equals(key);
+            if (!isAutoHide && !isConnErr) continue;
 
             for (int j = i + 1; j <= Math.min(i + 6, insns.size() - 1); j++) {
                 Instruction cand = insns.get(j);
@@ -532,10 +765,10 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                     String mref = ((ReferenceInstruction) cand).getReference().toString();
                     if (mref.startsWith("Lapp/morphe/extension/shared/settings/BooleanSetting;-><init>(Ljava/lang/String;Ljava/lang/Boolean;")) {
                         FiveRegisterInstruction call = (FiveRegisterInstruction) cand;
-                        // In Settings.<clinit> around line 9792, v9 holds Boolean.TRUE and v4 holds Boolean.FALSE.
+                        // In Settings.<clinit> around lines 9672-9792, v9 holds Boolean.TRUE and v4 holds Boolean.FALSE.
                         if (call.getRegisterE() != 9) {
                             throw new IllegalStateException(
-                                "Unexpected default boolean register for sb_toast_on_connection_error: v" + call.getRegisterE()
+                                "Unexpected default boolean register for " + key + ": v" + call.getRegisterE()
                             );
                         }
                         mutable.replaceInstruction(
@@ -551,11 +784,18 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                                 ((ReferenceInstruction) cand).getReference()
                             )
                         );
-                        flippedConnErrorToast = true;
+                        if (isAutoHide) flippedAutoHideSkipBtn = true;
+                        if (isConnErr) flippedConnErrorToast = true;
                         break;
                     }
                 }
             }
+        }
+        if (!flippedSponsorManualSkip) {
+            throw new IllegalStateException("Could not flip sb_sponsor default to MANUAL_SKIP in Settings.<clinit>");
+        }
+        if (!flippedAutoHideSkipBtn) {
+            throw new IllegalStateException("Could not flip sb_auto_hide_skip_button default in Settings.<clinit>");
         }
         if (!flippedConnErrorToast) {
             throw new IllegalStateException("Could not flip sb_toast_on_connection_error default in Settings.<clinit>");
