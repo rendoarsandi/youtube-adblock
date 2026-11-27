@@ -381,13 +381,68 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def find_sdk_tool(name: str) -> str:
+    found = shutil.which(name)
+    if found:
+        return found
+    for env_var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        root = os.environ.get(env_var)
+        if not root:
+            continue
+        bt_dir = Path(root) / "build-tools"
+        if bt_dir.is_dir():
+            candidates = sorted(bt_dir.glob(f"*/{name}"), reverse=True)
+            for cand in candidates:
+                if cand.is_file():
+                    return str(cand)
+    for fallback_root in (Path("/opt/android-sdk"), Path("/usr/local/lib/android/sdk")):
+        bt_dir = fallback_root / "build-tools"
+        if bt_dir.is_dir():
+            candidates = sorted(bt_dir.glob(f"*/{name}"), reverse=True)
+            for cand in candidates:
+                if cand.is_file():
+                    return str(cand)
+    raise RuntimeError(f"Required Android build tool not found on PATH or ANDROID_HOME: {name}")
+
+
+def find_default_d8_jar() -> Path:
+    termux_d8 = Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr")) / "share/java/d8.jar"
+    if termux_d8.is_file():
+        return termux_d8
+    for env_var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        root = os.environ.get(env_var)
+        if not root:
+            continue
+        bt_dir = Path(root) / "build-tools"
+        if bt_dir.is_dir():
+            candidates = sorted(bt_dir.glob("*/lib/d8.jar"), reverse=True)
+            if candidates:
+                return candidates[0]
+    for fallback_root in (Path("/opt/android-sdk"), Path("/usr/local/lib/android/sdk")):
+        bt_dir = fallback_root / "build-tools"
+        if bt_dir.is_dir():
+            candidates = sorted(bt_dir.glob("*/lib/d8.jar"), reverse=True)
+            if candidates:
+                return candidates[0]
+    return termux_d8
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-apk", type=Path, default=DEFAULT_INPUT_APK)
+    parser.add_argument("--d8-jar", type=Path, default=find_default_d8_jar())
+    parser.add_argument("--keystore", type=Path, default=None)
+    parser.add_argument("--password-file", type=Path, default=None)
+    parser.add_argument("--key-alias", default="local-experiment")
     parser.add_argument(
-        "--d8-jar",
-        type=Path,
-        default=Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr")) / "share/java/d8.jar",
+        "--allow-new-signer",
+        action="store_true",
+        help="Allow signing with a different certificate than the v0.1.9 input APK (requires one-time reinstall).",
+    )
+    parser.add_argument(
+        "--expected-cert-sha256",
+        default=None,
+        help="Optional lowercase hex SHA-256 fingerprint the output APK signing certificate must match.",
     )
     parser.add_argument("--skip-download-copy", action="store_true")
     args = parser.parse_args()
@@ -407,6 +462,9 @@ def main() -> int:
     javac = shutil.which("javac")
     if not java or not javac:
         raise RuntimeError("java and javac are required")
+    zipalign = find_sdk_tool("zipalign")
+    apksigner = find_sdk_tool("apksigner")
+    aapt = find_sdk_tool("aapt")
 
     with tempfile.TemporaryDirectory(prefix="yt-v0110-") as tmp:
         work_dir = Path(tmp)
@@ -543,12 +601,16 @@ public final class UpdateApkV0110 {
         (OUTPUT_DIR / "resource-repair.json").write_text(json.dumps(changes, indent=2) + "\n", encoding="utf-8")
 
         aligned_apk = work_dir / "aligned.apk"
-        run(["zipalign", "-P", "16", "-f", "4", str(fixed_apk), str(aligned_apk)])
+        run([zipalign, "-P", "16", "-f", "4", str(fixed_apk), str(aligned_apk)])
 
-        dummy_args = argparse.Namespace(keystore=None, password_file=None, key_alias="local-experiment")
-        key, password, alias = build.signing_key(dummy_args, OUTPUT_DIR)
+        signing_args = argparse.Namespace(
+            keystore=args.keystore,
+            password_file=args.password_file,
+            key_alias=args.key_alias,
+        )
+        key, password, alias = build.signing_key(signing_args, OUTPUT_DIR)
         run([
-            "apksigner", "sign",
+            apksigner, "sign",
             "--ks", str(key),
             "--ks-key-alias", str(alias),
             "--ks-pass", "file:" + str(password),
@@ -557,9 +619,9 @@ public final class UpdateApkV0110 {
         ])
 
         # 6. Verify signature match, alignment, badging, CRC, and unchanged assets
-        signature = run(["apksigner", "verify", "--verbose", "--print-certs", str(OUTPUT_APK)])
+        signature = run([apksigner, "verify", "--verbose", "--print-certs", str(OUTPUT_APK)])
         (OUTPUT_DIR / "signature.txt").write_text(signature, encoding="utf-8")
-        old_signature = run(["apksigner", "verify", "--print-certs", str(base_apk)])
+        old_signature = run([apksigner, "verify", "--print-certs", str(base_apk)])
 
         def cert_sha(text: str) -> str:
             m = re.search(r"certificate SHA-256 digest: ([0-9a-f]+)", text)
@@ -567,11 +629,18 @@ public final class UpdateApkV0110 {
                 raise RuntimeError("Could not parse certificate SHA-256 digest")
             return m.group(1)
 
-        if cert_sha(signature) != cert_sha(old_signature):
-            raise RuntimeError("Update certificate changed!")
+        new_cert_sha = cert_sha(signature)
+        old_cert_sha = cert_sha(old_signature)
+        same_signer_as_v019 = new_cert_sha == old_cert_sha
+        if args.expected_cert_sha256:
+            expected_sha = args.expected_cert_sha256.strip().lower()
+            if new_cert_sha != expected_sha:
+                raise RuntimeError(f"Signing certificate mismatch: {new_cert_sha} != {expected_sha}")
+        elif not same_signer_as_v019 and not args.allow_new_signer:
+            raise RuntimeError("Update certificate changed! Pass --allow-new-signer to intentionally rotate keys.")
 
-        run(["zipalign", "-c", "-P", "16", "4", str(OUTPUT_APK)])
-        badging = run(["aapt", "dump", "badging", str(OUTPUT_APK)])
+        run([zipalign, "-c", "-P", "16", "4", str(OUTPUT_APK)])
+        badging = run([aapt, "dump", "badging", str(OUTPUT_APK)])
         (OUTPUT_DIR / "badging.txt").write_text(badging, encoding="utf-8")
         if "name='app.revanced.android.youtube'" not in badging or "versionCode='1561301421'" not in badging:
             raise RuntimeError("Unexpected update identity")
@@ -591,7 +660,8 @@ public final class UpdateApkV0110 {
             "version_code": 1561301421,
             "apk_sha256": out_sha,
             "apk_bytes": OUTPUT_APK.stat().st_size,
-            "same_signer_as_v019": True,
+            "signer_cert_sha256": new_cert_sha,
+            "same_signer_as_v019": same_signer_as_v019,
             "changes": [
                 "Disabled LocalDiagnostics and PlaybackDiagnostics (no background threads or Download/YouTube-Adblock-Diagnostics files)",
                 "Wired VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to Morphe SponsorBlock via SponsorBlockBridge (with videoLength > 0 guard)",
@@ -610,7 +680,7 @@ public final class UpdateApkV0110 {
             shutil.copyfile(OUTPUT_APK, DOWNLOAD_APK)
             print(f"Copied signed APK to {DOWNLOAD_APK}")
 
-        print(f"BUILT_OK {OUTPUT_APK} sha256={out_sha}")
+        print(f"BUILT_OK {OUTPUT_APK} sha256={out_sha} cert_sha256={new_cert_sha}")
     return 0
 
 
