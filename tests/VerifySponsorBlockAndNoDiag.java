@@ -195,15 +195,27 @@ public final class VerifySponsorBlockAndNoDiag {
         Class<?> settings = Class.forName("app.morphe.extension.youtube.settings.Settings", true, loader);
         Object sbEnabled = settings.getField("SB_ENABLED").get(null);
         Object sbSponsor = settings.getField("SB_CATEGORY_SPONSOR").get(null);
+        Object sbHighlight = settings.getField("SB_CATEGORY_HIGHLIGHT").get(null);
+        Object sbPreview = settings.getField("SB_CATEGORY_PREVIEW").get(null);
+        Object sbIntro = settings.getField("SB_CATEGORY_INTRO").get(null);
+        Object sbOutro = settings.getField("SB_CATEGORY_OUTRO").get(null);
+        Object sbHook = settings.getField("SB_CATEGORY_HOOK").get(null);
+        Object sbFiller = settings.getField("SB_CATEGORY_FILLER").get(null);
         Object sbToast = settings.getField("SB_TOAST_ON_SKIP").get(null);
         Object sbAutoHide = settings.getField("SB_AUTO_HIDE_SKIP_BUTTON").get(null);
         Object sbConnErr = settings.getField("SB_TOAST_ON_CONNECTION_ERROR").get(null);
         check(Boolean.TRUE.equals(sbEnabled.getClass().getMethod("get").invoke(sbEnabled)), "SB_ENABLED should be true");
         check("manual-skip".equals(sbSponsor.getClass().getMethod("get").invoke(sbSponsor)), "SB_CATEGORY_SPONSOR should be manual-skip");
+        check("seekbar-only".equals(sbHighlight.getClass().getMethod("get").invoke(sbHighlight)), "SB_CATEGORY_HIGHLIGHT should be seekbar-only");
+        check("manual-skip".equals(sbPreview.getClass().getMethod("get").invoke(sbPreview)), "SB_CATEGORY_PREVIEW should be manual-skip");
+        check("manual-skip".equals(sbIntro.getClass().getMethod("get").invoke(sbIntro)), "SB_CATEGORY_INTRO should remain manual-skip");
+        check("manual-skip".equals(sbOutro.getClass().getMethod("get").invoke(sbOutro)), "SB_CATEGORY_OUTRO should remain manual-skip");
+        check("ignore".equals(sbHook.getClass().getMethod("get").invoke(sbHook)), "SB_CATEGORY_HOOK should remain ignore");
+        check("ignore".equals(sbFiller.getClass().getMethod("get").invoke(sbFiller)), "SB_CATEGORY_FILLER should remain ignore");
         check(Boolean.TRUE.equals(sbToast.getClass().getMethod("get").invoke(sbToast)), "SB_TOAST_ON_SKIP should be true");
         check(Boolean.FALSE.equals(sbAutoHide.getClass().getMethod("get").invoke(sbAutoHide)), "SB_AUTO_HIDE_SKIP_BUTTON should be false");
         check(Boolean.FALSE.equals(sbConnErr.getClass().getMethod("get").invoke(sbConnErr)), "SB_TOAST_ON_CONNECTION_ERROR should be false");
-        System.out.println("PASS: SponsorBlock settings defaults verified (enabled=true, sponsor=manual-skip, toast=true, autoHideSkipBtn=false, connErrToast=false)");
+        System.out.println("PASS: SponsorBlock settings defaults verified (enabled=true, sponsor=manual-skip, highlight=seekbar-only, preview=manual-skip, toast=true, autoHideSkipBtn=false, connErrToast=false)");
 
         // 4. Initialize SponsorBlockSettings and verify API fetch categories are populated
         Class<?> sbSettings = Class.forName("app.morphe.extension.youtube.sponsorblock.SponsorBlockSettings", true, loader);
@@ -211,7 +223,9 @@ public final class VerifySponsorBlockAndNoDiag {
         Class<?> segCat = Class.forName("app.morphe.extension.youtube.sponsorblock.objects.SegmentCategory", true, loader);
         String fetchCats = (String) segCat.getField("sponsorBlockAPIFetchCategories").get(null);
         check(fetchCats != null && fetchCats.contains("sponsor") && fetchCats.contains("selfpromo")
-            && fetchCats.contains("intro") && fetchCats.contains("outro"),
+            && fetchCats.contains("poi_highlight") && fetchCats.contains("preview")
+            && fetchCats.contains("intro") && fetchCats.contains("outro")
+            && !fetchCats.contains("hook") && !fetchCats.contains("filler"),
             "Unexpected sponsorBlockAPIFetchCategories: " + fetchCats);
         System.out.println("PASS: SponsorBlock fetch categories active: " + fetchCats);
 
@@ -225,6 +239,8 @@ public final class VerifySponsorBlockAndNoDiag {
         skipBtnCls.getMethod("setVisibility", int.class);
         skipBtnCls.getMethod("dispatchDraw", Canvas.class);
         Object sponsorEnum = Enum.valueOf((Class<Enum>) segCat, "SPONSOR");
+        Object highlightEnum = Enum.valueOf((Class<Enum>) segCat, "HIGHLIGHT");
+        Object previewEnum = Enum.valueOf((Class<Enum>) segCat, "PREVIEW");
         Object introEnum = Enum.valueOf((Class<Enum>) segCat, "INTRO");
         Object seg = segCls.getConstructor(segCat, String.class, long.class, long.class, boolean.class)
             .newInstance(sponsorEnum, "uuid-test", 20000L, 50000L, false);
@@ -255,10 +271,16 @@ public final class VerifySponsorBlockAndNoDiag {
         check(extracted != null && extracted.left == 0 && extracted.top == 96 && extracted.right == 1080 && extracted.bottom == 704,
             "Expected extractPlayerRectFromQyn to return [0,96,1080,704], got " + extracted);
 
-        // Verify SPONSOR category resolves to MANUAL_SKIP so clickable Skip pill shows on sponsors
+        // Verify SPONSOR & PREVIEW resolve to MANUAL_SKIP and HIGHLIGHT resolves to SHOW_IN_SEEKBAR
         Object sponsorBehaviour = segCat.getField("behaviour").get(sponsorEnum);
         check("MANUAL_SKIP".equals(String.valueOf(sponsorBehaviour)),
             "Expected SPONSOR behaviour=MANUAL_SKIP, got " + sponsorBehaviour);
+        Object highlightBehaviour = segCat.getField("behaviour").get(highlightEnum);
+        check("SHOW_IN_SEEKBAR".equals(String.valueOf(highlightBehaviour)),
+            "Expected HIGHLIGHT behaviour=SHOW_IN_SEEKBAR, got " + highlightBehaviour);
+        Object previewBehaviour = segCat.getField("behaviour").get(previewEnum);
+        check("MANUAL_SKIP".equals(String.valueOf(previewBehaviour)),
+            "Expected PREVIEW behaviour=MANUAL_SKIP, got " + previewBehaviour);
 
         Class<?> viewCtrl = Class.forName("app.morphe.extension.youtube.sponsorblock.ui.SponsorBlockViewController", true, loader);
         Class<?> playerTypeCls = Class.forName("app.morphe.extension.youtube.shared.PlayerType", true, loader);
@@ -277,18 +299,50 @@ public final class VerifySponsorBlockAndNoDiag {
         viewCtrl.getMethod("showSkipSegmentButton", segCls).invoke(null, introSeg);
         Field skipSegField = viewCtrl.getDeclaredField("skipSegment");
         skipSegField.setAccessible(true);
+        Field skipHighlightField = viewCtrl.getDeclaredField("skipHighlight");
+        skipHighlightField.setAccessible(true);
         check(skipSegField.get(null) == introSeg, "Expected skipSegment to be set to introSeg");
         viewCtrl.getMethod("hideSkipSegmentButton").invoke(null);
         check(skipSegField.get(null) == null, "Expected skipSegment cleared after hideSkipSegmentButton");
         System.out.println("PASS: SkipSponsorButton, SponsorBlockOverlayHelper hooks, and PlayerType->canShowViewElements verified on ART");
 
-        // 6. Test seekbar drawing and videoLength==0 guard on real Android Bitmap/Canvas
+        // 6. Test 2h podcast scenario: 1h poi_highlight must NOT show Skip-to-highlight pill (seekbar dot only),
+        //    while 0:00-1:45 opening preview reel MUST show manual Skip-preview pill
         Class<?> vidInfo = Class.forName("app.morphe.extension.youtube.shared.VideoInformation", true, loader);
         Class<?> bridge = Class.forName("app.local.youtube.adblock.SponsorBlockBridge", true, loader);
+        Class<?> ctrl = Class.forName("app.morphe.extension.youtube.sponsorblock.SegmentPlaybackController", true, loader);
         vidInfo.getMethod("setVideoLength", long.class).invoke(null, 0L);
         bridge.getMethod("onVideoTime", long.class).invoke(null, 5000L);
+        vidInfo.getMethod("setVideoLength", long.class).invoke(null, 7200000L);
+
+        Object previewSeg = segCls.getConstructor(segCat, String.class, long.class, long.class, boolean.class)
+            .newInstance(previewEnum, "uuid-preview", 0L, 105000L, false);
+        Object highlightSeg = segCls.getConstructor(segCat, String.class, long.class, long.class, boolean.class)
+            .newInstance(highlightEnum, "uuid-highlight", 3600000L, 3600000L, false);
+        Object podcastSegs = Array.newInstance(segCls, 2);
+        Array.set(podcastSegs, 0, previewSeg);
+        Array.set(podcastSegs, 1, highlightSeg);
+        Method setSegmentsMethod = ctrl.getDeclaredMethod("setSegments", podcastSegs.getClass());
+        setSegmentsMethod.setAccessible(true);
+        setSegmentsMethod.invoke(null, podcastSegs);
+
+        Field highlightField = ctrl.getDeclaredField("highlightSegment");
+        highlightField.setAccessible(true);
+        check(highlightField.get(null) == null, "Expected highlightSegment=null when HIGHLIGHT is SHOW_IN_SEEKBAR");
+        bridge.getMethod("onVideoTime", long.class).invoke(null, 1000L);
+        check(skipHighlightField.get(null) == null, "Expected no Skip-to-highlight pill at video start");
+        check(skipSegField.get(null) == previewSeg, "Expected Skip-preview pill during 0:00-1:45 opening preview");
+
+        Bitmap podcastBmp = Bitmap.createBitmap(100, 20, Bitmap.Config.ARGB_8888);
+        Canvas podcastCanvas = new Canvas(podcastBmp);
+        bridge.getMethod("drawSeekbarSegments", Object.class, Canvas.class)
+            .invoke(null, new FakeTimeBar(0, 5, 100, 15), podcastCanvas);
+        check(podcastBmp.getPixel(52, 10) != 0, "Expected pink highlight marker drawn on seekbar at midpoint");
+        viewCtrl.getMethod("hideAll").invoke(null);
+        System.out.println("PASS: 2h podcast scenario verified (no Skip-to-highlight pill, Skip-preview active, highlight marker on seekbar)");
+
+        // 7. Test sponsor seekbar drawing on real Android Bitmap/Canvas
         vidInfo.getMethod("setVideoLength", long.class).invoke(null, 100000L);
-        Class<?> ctrl = Class.forName("app.morphe.extension.youtube.sponsorblock.SegmentPlaybackController", true, loader);
         Field segsField = ctrl.getDeclaredField("segments");
         segsField.setAccessible(true);
         Object segArr = Array.newInstance(segCls, 1);
@@ -306,6 +360,6 @@ public final class VerifySponsorBlockAndNoDiag {
         check(outsideBefore == 0 && outsideAfter == 0, "Expected transparent seekbar outside segment range");
         System.out.println("PASS: Seekbar segment bar drawn cleanly (insideColor=0x" + Integer.toHexString(insidePixel) + ")");
 
-        System.out.println("ALL_V0112_ART_CHECKS_PASSED");
+        System.out.println("ALL_V0113_ART_CHECKS_PASSED");
     }
 }

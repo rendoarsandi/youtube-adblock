@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build v0.1.12 (SponsorBlock Premium-style Skip button bounds/multi-player/manual-skip fix) on top of v0.1.9."""
+"""Build v0.1.13 (SponsorBlock highlight seekbar-only + preview manual-skip) on top of v0.1.9."""
 from __future__ import annotations
 
 import argparse
@@ -26,9 +26,9 @@ APKEDITOR_JAR = TOOLS_DIR / "APKEditor-1.4.9.jar"
 CLASSPATH = f"{REVANCED_JAR}:{APKEDITOR_JAR}"
 DEFAULT_INPUT_APK = LOCAL_BUILD / "youtube-noshorts-v019-final/YouTube-Adblock-v0.1.9.apk"
 INPUT_SHA = "12730ca6cd102268a395a173cc73609005c857f085111423d8ef40f84fd4ef93"
-OUTPUT_DIR = LOCAL_BUILD / "youtube-sponsorblock-v0112-final"
-OUTPUT_APK = OUTPUT_DIR / "YouTube-Adblock-v0.1.12.apk"
-DOWNLOAD_APK = Path("/sdcard/Download/YouTube-Adblock-v0.1.12.apk")
+OUTPUT_DIR = LOCAL_BUILD / "youtube-sponsorblock-v0113-final"
+OUTPUT_APK = OUTPUT_DIR / "YouTube-Adblock-v0.1.13.apk"
+DOWNLOAD_APK = Path("/sdcard/Download/YouTube-Adblock-v0.1.13.apk")
 
 
 COMPILE_STUBS: dict[str, str] = {
@@ -478,7 +478,7 @@ public final class UpdateApkV0110 {
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[2])), "classes2.dex"));
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[3])), "classes9.dex"));
             module.add(new ByteInputSource(Files.readAllBytes(Path.of(args[4])), "classes11.dex"));
-            manifest.setVersionCode(1561301420);
+            manifest.setVersionCode(1561301421);
             module.setApkSignatureBlock(null);
             module.removeInputSource("stamp-cert-sha256");
             for (var source : module.listInputSources()) {
@@ -573,7 +573,7 @@ public final class UpdateApkV0110 {
         run(["zipalign", "-c", "-P", "16", "4", str(OUTPUT_APK)])
         badging = run(["aapt", "dump", "badging", str(OUTPUT_APK)])
         (OUTPUT_DIR / "badging.txt").write_text(badging, encoding="utf-8")
-        if "name='app.revanced.android.youtube'" not in badging or "versionCode='1561301420'" not in badging:
+        if "name='app.revanced.android.youtube'" not in badging or "versionCode='1561301421'" not in badging:
             raise RuntimeError("Unexpected update identity")
 
         with zipfile.ZipFile(base_apk) as before, zipfile.ZipFile(OUTPUT_APK) as after:
@@ -587,8 +587,8 @@ public final class UpdateApkV0110 {
         metadata = {
             "package": build.PACKAGE,
             "version": "21.40.161",
-            "patch_version": "v0.1.12",
-            "version_code": 1561301420,
+            "patch_version": "v0.1.13",
+            "version_code": 1561301421,
             "apk_sha256": out_sha,
             "apk_bytes": OUTPUT_APK.stat().st_size,
             "same_signer_as_v019": True,
@@ -597,7 +597,8 @@ public final class UpdateApkV0110 {
                 "Wired VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to Morphe SponsorBlock via SponsorBlockBridge (with videoLength > 0 guard)",
                 "Hooked YouTubePlayerOverlaysLayout.u(Optional<Lqyn>) so the main watch player (Loif.t) owns SponsorBlockViewController's Skip pill overlay and secondary inline feed players (Loif.d) cannot hijack it",
                 "Positioned and measured the SponsorBlock overlay using the live video player bounds qyn.b().C() (matching YouTube's Lqol overlays) and forced re-measure when SkipSponsorButton transitions GONE -> VISIBLE",
-                "Changed SB_CATEGORY_SPONSOR default to manual-skip and disabled SB_AUTO_HIDE_SKIP_BUTTON so sponsors and other segments show a persistent clickable Premium-style Skip pill",
+                "Changed SB_CATEGORY_SPONSOR and SB_CATEGORY_PREVIEW defaults to manual-skip so sponsors and opening preview/teaser reels show a persistent clickable Skip pill, and disabled SB_AUTO_HIDE_SKIP_BUTTON",
+                "Changed SB_CATEGORY_HIGHLIGHT default to seekbar-only (SHOW_IN_SEEKBAR) so the misleading 'Skip to highlight' jump pill never appears while keeping the pink highlight marker on the seekbar",
                 "Rendered colored SponsorBlock segment bars on the seekbar in Ljsi.onDraw before the scrubber thumb",
                 "Disabled SB_TOAST_ON_CONNECTION_ERROR by default to keep network hiccups silent",
             ],

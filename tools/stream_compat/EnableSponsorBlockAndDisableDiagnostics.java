@@ -24,6 +24,7 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableDexFile;
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod;
 import com.android.tools.smali.dexlib2.immutable.reference.ImmutableFieldReference;
 import com.android.tools.smali.dexlib2.immutable.reference.ImmutableMethodReference;
+import com.android.tools.smali.dexlib2.immutable.reference.ImmutableStringReference;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Applies v0.1.12 SponsorBlock + disable-diagnostics patches on top of v0.1.9:
+ * Applies v0.1.13 SponsorBlock + disable-diagnostics patches on top of v0.1.9:
  * 1. classes2.dex:
  *    - YouTubePlayerOverlaysLayout;->onFinishInflate()V:
  *      calls SponsorBlockViewController.initialize(this) to attach the floating Skip pill overlay.
@@ -49,9 +50,13 @@ import java.util.List;
  *    - Replaces SkipSponsorButton with programmatic view (removes old synthetic lambda).
  *    - Routes SponsorBlockViewController.initialize(ViewGroup) to SponsorBlockOverlayHelper.initialize(ViewGroup).
  *    - Wires VideoInformation.{initialize,setVideoId,setVideoInformation,setVideoTime} to SponsorBlockBridge.
- *    - Sets Settings.SB_CATEGORY_SPONSOR default to CategoryBehaviour.MANUAL_SKIP ("manual-skip") so
- *      sponsors show the clickable Premium-style Skip pill, and flips SB_AUTO_HIDE_SKIP_BUTTON &
- *      SB_TOAST_ON_CONNECTION_ERROR defaults to Boolean.FALSE.
+ *    - Adjusts SponsorBlock defaults in Settings.<clinit>:
+ *      * SB_CATEGORY_SPONSOR -> CategoryBehaviour.MANUAL_SKIP ("manual-skip")
+ *      * SB_CATEGORY_HIGHLIGHT -> CategoryBehaviour.SHOW_IN_SEEKBAR ("seekbar-only") so the misleading
+ *        "Skip to highlight" jump pill does not appear while keeping the pink seekbar marker
+ *      * SB_CATEGORY_PREVIEW -> CategoryBehaviour.MANUAL_SKIP ("manual-skip") so opening preview/teaser
+ *        reels show a clickable "Skip preview »" pill
+ *      * SB_AUTO_HIDE_SKIP_BUTTON & SB_TOAST_ON_CONNECTION_ERROR -> Boolean.FALSE
  * 3. classes11.dex:
  *    - Replaces PlaybackDiagnostics with no-op (removes PlaybackDiagnostics$* inner classes).
  *    - Adds SponsorBlockBridge (+ inner classes) and SponsorBlockOverlayHelper (+ inner classes).
@@ -106,7 +111,7 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
         patchClasses2(new File(args[0]), new File(args[1]));
         patchClasses9(new File(args[2]), new File(args[3]), newLocalDiag, skipBtnClasses);
         patchClasses11(new File(args[4]), new File(args[5]), newPlaybackDiag, bridgeAndOverlayClasses);
-        System.out.println("EnableSponsorBlockAndDisableDiagnostics applied all v0.1.12 DEX patches.");
+        System.out.println("EnableSponsorBlockAndDisableDiagnostics applied all v0.1.13 DEX patches.");
     }
 
     private static void patchClasses2(File inDex, File outDex) throws Exception {
@@ -715,6 +720,8 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
         boolean flippedAutoHideSkipBtn = false;
         boolean flippedConnErrorToast = false;
         boolean flippedSponsorManualSkip = false;
+        boolean flippedHighlightSeekbarOnly = false;
+        boolean flippedPreviewManualSkip = false;
 
         for (int i = 0; i < insns.size() - 3; i++) {
             Instruction cur = insns.get(i);
@@ -750,6 +757,20 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
                         break;
                     }
                 }
+                continue;
+            }
+
+            if ("sb_highlight".equals(key)) {
+                flippedHighlightSeekbarOnly = overrideCategoryBehaviourDefaultString(
+                    mutable, insns, i, key, "seekbar-only"
+                );
+                continue;
+            }
+
+            if ("sb_preview".equals(key)) {
+                flippedPreviewManualSkip = overrideCategoryBehaviourDefaultString(
+                    mutable, insns, i, key, "manual-skip"
+                );
                 continue;
             }
 
@@ -794,6 +815,12 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
         if (!flippedSponsorManualSkip) {
             throw new IllegalStateException("Could not flip sb_sponsor default to MANUAL_SKIP in Settings.<clinit>");
         }
+        if (!flippedHighlightSeekbarOnly) {
+            throw new IllegalStateException("Could not flip sb_highlight default to seekbar-only in Settings.<clinit>");
+        }
+        if (!flippedPreviewManualSkip) {
+            throw new IllegalStateException("Could not flip sb_preview default to manual-skip in Settings.<clinit>");
+        }
         if (!flippedAutoHideSkipBtn) {
             throw new IllegalStateException("Could not flip sb_auto_hide_skip_button default in Settings.<clinit>");
         }
@@ -801,6 +828,64 @@ public final class EnableSponsorBlockAndDisableDiagnostics {
             throw new IllegalStateException("Could not flip sb_toast_on_connection_error default in Settings.<clinit>");
         }
         return cloneMethod(m, mutable);
+    }
+
+    /** Replaces only the per-setting `iget-object vDefault, vBehaviour, CategoryBehaviour->reVancedKeyValue`
+     *  instruction with `const-string vDefault, newDefaultValue` so shared CategoryBehaviour registers
+     *  (e.g. MANUAL_SKIP / IGNORE reused by neighboring categories) remain untouched.
+     */
+    private static boolean overrideCategoryBehaviourDefaultString(
+        MutableMethodImplementation mutable,
+        List<? extends Instruction> insns,
+        int keyIdx,
+        String key,
+        String newDefaultValue
+    ) {
+        Instruction keyInsn = insns.get(keyIdx);
+        if (!(keyInsn instanceof OneRegisterInstruction)) return false;
+        int keyReg = ((OneRegisterInstruction) keyInsn).getRegisterA();
+
+        int defaultReg = -1;
+        for (int j = keyIdx + 1; j <= Math.min(keyIdx + 4, insns.size() - 1); j++) {
+            Instruction cand = insns.get(j);
+            if (cand.getOpcode() == Opcode.INVOKE_DIRECT
+                && cand instanceof FiveRegisterInstruction
+                && cand instanceof ReferenceInstruction) {
+                String mref = ((ReferenceInstruction) cand).getReference().toString();
+                if ("Lapp/morphe/extension/shared/settings/StringSetting;-><init>(Ljava/lang/String;Ljava/lang/String;Lapp/morphe/extension/shared/settings/Setting$Availability;)V"
+                    .equals(mref)) {
+                    FiveRegisterInstruction call = (FiveRegisterInstruction) cand;
+                    if (call.getRegisterD() == keyReg) {
+                        defaultReg = call.getRegisterE();
+                        break;
+                    }
+                }
+            }
+        }
+        if (defaultReg < 0 || defaultReg > 255) {
+            throw new IllegalStateException("Could not locate StringSetting default register for " + key);
+        }
+
+        for (int j = keyIdx - 1; j >= Math.max(0, keyIdx - 8); j--) {
+            Instruction prev = insns.get(j);
+            if (prev.getOpcode() == Opcode.IGET_OBJECT
+                && prev instanceof TwoRegisterInstruction
+                && prev instanceof ReferenceInstruction
+                && ((TwoRegisterInstruction) prev).getRegisterA() == defaultReg
+                && "Lapp/morphe/extension/youtube/sponsorblock/objects/CategoryBehaviour;->reVancedKeyValue:Ljava/lang/String;"
+                    .equals(((ReferenceInstruction) prev).getReference().toString())) {
+                mutable.replaceInstruction(
+                    j,
+                    new BuilderInstruction21c(
+                        Opcode.CONST_STRING,
+                        defaultReg,
+                        new ImmutableStringReference(newDefaultValue)
+                    )
+                );
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void patchClasses11(
